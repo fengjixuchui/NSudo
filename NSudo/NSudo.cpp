@@ -21,27 +21,53 @@
 
 #include <string>
 
-DWORD M2RegSetStringValue(
+
+std::wstring GetMessageByID(DWORD MessageID)
+{
+    std::wstring MessageString;
+    LPWSTR pBuffer = nullptr;
+
+    if (FormatMessageW(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+        nullptr,
+        MessageID,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPTSTR>(&pBuffer),
+        0,
+        nullptr))
+    {
+        MessageString = std::wstring(pBuffer, wcslen(pBuffer));
+
+        LocalFree(pBuffer);
+    }
+
+    return MessageString;
+}
+
+HRESULT M2RegSetStringValue(
     _In_ HKEY hKey,
     _In_opt_ LPCWSTR lpValueName,
     _In_opt_ LPCWSTR lpValueData)
 {
-    return RegSetValueExW(
+    if (!lpValueName || !lpValueData)
+        return __HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER);
+    
+    return M2RegSetValue(
         hKey,
         lpValueName,
         0,
         REG_SZ,
         reinterpret_cast<CONST BYTE*>(lpValueData),
-        (DWORD)(wcslen(lpValueData) + 1) * sizeof(wchar_t));
+        static_cast<DWORD>(wcslen(lpValueData) + 1) * sizeof(wchar_t));
 }
 
-DWORD M2RegCreateKey(
+HRESULT M2RegCreateKey(
     _In_ HKEY hKey,
     _In_ LPCWSTR lpSubKey,
     _In_ REGSAM samDesired,
     _Out_ PHKEY phkResult)
 {
-    return RegCreateKeyExW(
+    return M2RegCreateKey(
         hKey,
         lpSubKey,
         0,
@@ -53,77 +79,59 @@ DWORD M2RegCreateKey(
         nullptr);
 }
 
-DWORD CreateCommandStoreItem(
+HRESULT CreateCommandStoreItem(
     _In_ HKEY CommandStoreRoot,
     _In_ LPCWSTR ItemName,
     _In_ LPCWSTR ItemDescription,
     _In_ LPCWSTR ItemCommand,
     _In_ bool HasLUAShield)
 {
-    DWORD dwError = ERROR_SUCCESS;
+    HRESULT hr = S_OK;
     M2::CHKey hCommandStoreItem;
     M2::CHKey hCommandStoreItemCommand;
 
-    dwError = M2RegCreateKey(
+    hr = M2RegCreateKey(
         CommandStoreRoot,
         ItemName,
         KEY_ALL_ACCESS | KEY_WOW64_64KEY,
         &hCommandStoreItem);
-    if (ERROR_SUCCESS != dwError)
-        return dwError;
+    if (FAILED(hr))
+        return hr;
 
-    dwError = M2RegSetStringValue(
+    hr = M2RegSetStringValue(
         hCommandStoreItem,
         L"",
         ItemDescription);
-    if (ERROR_SUCCESS != dwError)
-        return dwError;
+    if (FAILED(hr))
+        return hr;
 
     if (HasLUAShield)
     {
-        dwError = M2RegSetStringValue(
+        hr = M2RegSetStringValue(
             hCommandStoreItem,
             L"HasLUAShield",
             L"");
-        if (ERROR_SUCCESS != dwError)
-            return dwError;
+        if (FAILED(hr))
+            return hr;
     }
 
-    dwError = M2RegCreateKey(
+    hr = M2RegCreateKey(
         hCommandStoreItem,
         L"command",
         KEY_ALL_ACCESS | KEY_WOW64_64KEY,
         &hCommandStoreItemCommand);
-    if (ERROR_SUCCESS != dwError)
-        return dwError;
+    if (FAILED(hr))
+        return hr;
 
-    dwError = M2RegSetStringValue(
+    hr = M2RegSetStringValue(
         hCommandStoreItemCommand,
         L"",
         ItemCommand);
-    if (ERROR_SUCCESS != dwError)
-        return dwError;
+    if (FAILED(hr))
+        return hr;
 
 
-    return dwError;
-}
-
-std::wstring NSudoExpandEnvironmentStrings(
-    const std::wstring& String)
-{
-    std::wstring ExpandedString;
-
-    ExpandedString.resize(static_cast<size_t>(ExpandEnvironmentStringsW(
-        String.c_str(),
-        nullptr,
-        0) - 1));
-
-    ExpandEnvironmentStringsW(
-        String.c_str(),
-        &ExpandedString[0],
-        static_cast<DWORD>(ExpandedString.size() + 1));
-
-    return ExpandedString;
+    return hr;
 }
 
 /*
@@ -205,22 +213,6 @@ SID_IDENTIFIER_AUTHORITY SIA_NT = SECURITY_NT_AUTHORITY;
 SID_IDENTIFIER_AUTHORITY SIA_IL = SECURITY_MANDATORY_LABEL_AUTHORITY;
 
 /*
-   NSudoStartService函数通过服务名启动服务并返回服务状态。
-   The NSudoStartService function starts a service and return service status
-   via service name.
-
-   如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-   If the function fails, the return value is NULL. To get extended error
-   information, call GetLastError.
-   */
-BOOL WINAPI NSudoStartService(
-    _In_ LPCWSTR lpServiceName,
-    _Out_ LPSERVICE_STATUS_PROCESS lpServiceStatus)
-{
-    return SUCCEEDED(M2StartService(lpServiceName, lpServiceStatus));
-}
-
-/*
 NSudoGetCurrentProcessSessionID获取当前进程的会话ID。
 The NSudoGetCurrentProcessSessionID function obtains the Session ID of the
 current process.
@@ -232,14 +224,16 @@ information, call GetLastError.
 BOOL WINAPI NSudoGetCurrentProcessSessionID(
     _Out_ PDWORD SessionID)
 {
+    *SessionID = static_cast<DWORD>(-1);
+
     BOOL result = FALSE;
     M2::CHandle hToken;
     DWORD ReturnLength = 0;
 
-    result = OpenProcessToken(
-        GetCurrentProcess(),
-        MAXIMUM_ALLOWED,
-        &hToken);
+    M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
+    TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::Current;
+    result = SUCCEEDED(M2OpenProcessToken(
+        &hToken, &TokenSource, MAXIMUM_ALLOWED));
     if (result)
     {
         result = GetTokenInformation(
@@ -272,12 +266,13 @@ BOOL WINAPI NSudoSetTokenPrivilege(
     TOKEN_PRIVILEGES TP;
 
     TP.PrivilegeCount = 1;
+    TP.Privileges[0].Luid.HighPart = 0;
     TP.Privileges[0].Luid.LowPart = Privilege;
     TP.Privileges[0].Attributes = (DWORD)(bEnable ? SE_PRIVILEGE_ENABLED : 0);
 
     // 设置进程特权
-    AdjustTokenPrivileges(hExistingToken, FALSE, &TP, 0, nullptr, nullptr);
-    return (GetLastError() == ERROR_SUCCESS);
+    return SUCCEEDED(M2AdjustTokenPrivileges(
+        hExistingToken, FALSE, &TP, 0, nullptr, nullptr));
 }
 
 /*
@@ -296,35 +291,22 @@ BOOL WINAPI NSudoSetTokenAllPrivileges(
     _In_ bool bEnable)
 {
     BOOL result = FALSE;
-    M2::CMemory<PTOKEN_PRIVILEGES> pTPs;
-    DWORD Length = 0;
+    M2::CM2Memory<PTOKEN_PRIVILEGES> pTPs;
 
-    // 获取特权信息大小
-    GetTokenInformation(
-        hExistingToken, TokenPrivileges, nullptr, 0, &Length);
-    result = (GetLastError() == ERROR_INSUFFICIENT_BUFFER);
+    result = SUCCEEDED(M2GetTokenInformation(
+        pTPs,
+        hExistingToken,
+        TokenPrivileges));
     if (result)
     {
-        // 分配内存
-        if (pTPs.Alloc(Length))
-        {
-            // 获取特权信息
-            result = GetTokenInformation(
-                hExistingToken, TokenPrivileges, pTPs, Length, &Length);
-            if (result)
-            {
-                // 设置特权信息
-                for (DWORD i = 0; i < pTPs->PrivilegeCount; ++i)
-                    pTPs->Privileges[i].Attributes =
-                    (DWORD)(bEnable ? SE_PRIVILEGE_ENABLED : 0);
+        // 设置特权信息
+        for (DWORD i = 0; i < pTPs->PrivilegeCount; ++i)
+            pTPs->Privileges[i].Attributes =
+            (DWORD)(bEnable ? SE_PRIVILEGE_ENABLED : 0);
 
-                // 设置进程特权
-                AdjustTokenPrivileges(
-                    hExistingToken, FALSE, pTPs, 0, nullptr, nullptr);
-                result = (GetLastError() == ERROR_SUCCESS);
-            }
-        }
-        else SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        // 设置进程特权
+        result = SUCCEEDED(M2AdjustTokenPrivileges(
+            hExistingToken, FALSE, pTPs, 0, nullptr, nullptr));
     }
 
     return result;
@@ -364,6 +346,8 @@ BOOL WINAPI NSudoSetTokenIntegrityLevel(
     return result;
 }
 
+
+
 /*
 NSudoCreateLUAToken函数从一个现有的访问令牌创建一个新的LUA访问令牌。
 The NSudoCreateLUAToken function creates a new LUA access token from an
@@ -377,14 +361,16 @@ BOOL WINAPI NSudoCreateLUAToken(
     _Out_ PHANDLE TokenHandle,
     _In_ HANDLE ExistingTokenHandle)
 {
+    *TokenHandle = INVALID_HANDLE_VALUE;
+
     BOOL result = FALSE;
     DWORD Length = 0;
     BOOL EnableTokenVirtualization = TRUE;
     TOKEN_OWNER Owner = { 0 };
     TOKEN_DEFAULT_DACL NewTokenDacl = { 0 };
     M2::CHandle hToken;
-    M2::CMemory<PTOKEN_USER> pTokenUser;
-    M2::CMemory<PTOKEN_DEFAULT_DACL> pTokenDacl;
+    M2::CM2Memory<PTOKEN_USER> pTokenUser;
+    M2::CM2Memory<PTOKEN_DEFAULT_DACL> pTokenDacl;
     M2::CSID pAdminSid;
     M2::CMemory<PACL> NewDefaultDacl;
     PACCESS_ALLOWED_ACE pTempAce = nullptr;
@@ -404,22 +390,11 @@ BOOL WINAPI NSudoCreateLUAToken(
         hToken, TOKEN_INTEGRITY_LEVELS_LIST::MediumLevel);
     if (!result) goto FuncEnd;
 
-    // 获取令牌对应的用户账户SID信息大小
-    GetTokenInformation(
-        hToken, TokenUser, nullptr, 0, &Length);
-    result = (GetLastError() == ERROR_INSUFFICIENT_BUFFER);
-    if (!result) goto FuncEnd;
-
-    // 为令牌对应的用户账户SID信息分配内存
-    if (!pTokenUser.Alloc(Length))
-    {
-        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        goto FuncEnd;
-    }
-
     // 获取令牌对应的用户账户SID信息
-    result = GetTokenInformation(
-        hToken, TokenUser, pTokenUser, Length, &Length);
+    result = SUCCEEDED(M2GetTokenInformation(
+        pTokenUser,
+        hToken,
+        TokenUser));
     if (!result) goto FuncEnd;
 
     // 设置令牌Owner为当前用户
@@ -428,22 +403,11 @@ BOOL WINAPI NSudoCreateLUAToken(
         hToken, TokenOwner, &Owner, sizeof(TOKEN_OWNER));
     if (!result) goto FuncEnd;
 
-    // 获取令牌的DACL信息大小
-    GetTokenInformation(
-        hToken, TokenDefaultDacl, nullptr, 0, &Length);
-    result = (GetLastError() == ERROR_INSUFFICIENT_BUFFER);
-    if (!result) goto FuncEnd;
-
-    // 为令牌的DACL信息分配内存
-    if (!pTokenDacl.Alloc(Length))
-    {
-        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        goto FuncEnd;
-    }
-
     // 获取令牌的DACL信息
-    result = GetTokenInformation(
-        hToken, TokenDefaultDacl, pTokenDacl, Length, &Length);
+    result = SUCCEEDED(M2GetTokenInformation(
+        pTokenDacl,
+        hToken,
+        TokenDefaultDacl));
     if (!result) goto FuncEnd;
 
     // 获取管理员组SID
@@ -520,194 +484,46 @@ FuncEnd: // 扫尾
     return result;
 }
 
-/*
-NSudoDuplicateProcessToken函数根据进程ID获取一个进程令牌的副本。
-The NSudoDuplicateProcessToken function obtains a copy of process token via
-Process ID.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoDuplicateProcessToken(
-    _In_ DWORD dwProcessID,
-    _In_ DWORD dwDesiredAccess,
-    _In_opt_ LPSECURITY_ATTRIBUTES lpTokenAttributes,
-    _In_ SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
-    _In_ TOKEN_TYPE TokenType,
-    _Outptr_ PHANDLE phToken)
+HRESULT M2QueryWinLogonProcessId(
+    _Out_ PDWORD ProcessId,
+    _In_ DWORD SessionId)
 {
-    BOOL result = FALSE;
-
-    M2::CHandle hProcess;
-    M2::CHandle hToken;
-
-    // 打开进程对象
-    hProcess = OpenProcess(MAXIMUM_ALLOWED, FALSE, dwProcessID);
-    if (hProcess)
-    {
-        // 打开进程令牌
-        result = OpenProcessToken(hProcess, MAXIMUM_ALLOWED, &hToken);
-        if (result)
-        {
-            // 复制令牌
-            result = DuplicateTokenEx(
-                hToken,
-                dwDesiredAccess,
-                lpTokenAttributes,
-                ImpersonationLevel,
-                TokenType,
-                phToken);
-        }
-    }
-
-    return result;
-}
-
-/*
-NSudoDuplicateSystemToken函数获取一个当前会话SYSTEM用户令牌的副本。
-The NSudoDuplicateSystemToken function obtains a copy of current session
-SYSTEM user token.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoDuplicateSystemToken(
-    _In_ DWORD dwDesiredAccess,
-    _In_opt_ LPSECURITY_ATTRIBUTES lpTokenAttributes,
-    _In_ SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
-    _In_ TOKEN_TYPE TokenType,
-    _Outptr_ PHANDLE phToken)
-{
-    BOOL result = FALSE;
-    DWORD dwWinLogonPID = (DWORD)-1;
-    DWORD dwSessionID = (DWORD)-1;
     M2::CWTSMemory<PWTS_PROCESS_INFOW> pProcesses;
     DWORD dwProcessCount = 0;
 
-    do
+    if (WTSEnumerateProcessesW(
+        WTS_CURRENT_SERVER_HANDLE,
+        0,
+        1,
+        &pProcesses,
+        &dwProcessCount))
     {
-        // 获取当前进程令牌会话ID
-        result = NSudoGetCurrentProcessSessionID(&dwSessionID);
-        if (!result) break;
-
-        // 遍历进程寻找winlogon进程并获取PID
-        if (WTSEnumerateProcessesW(
-            WTS_CURRENT_SERVER_HANDLE,
-            0,
-            1,
-            &pProcesses,
-            &dwProcessCount))
+        for (DWORD i = 0; i < dwProcessCount; ++i)
         {
-            for (DWORD i = 0; i < dwProcessCount; ++i)
-            {
-                PWTS_PROCESS_INFOW pProcess = &pProcesses[i];
+            PWTS_PROCESS_INFOW pProcess = &pProcesses[i];
 
-                if (pProcess->SessionId != dwSessionID) continue;
-                if (pProcess->pProcessName == nullptr) continue;
+            if (pProcess->SessionId != SessionId)
+                continue;
 
-                if (_wcsicmp(L"winlogon.exe", pProcess->pProcessName) == 0)
-                {
-                    dwWinLogonPID = pProcess->ProcessId;
-                    break;
-                }
-            }
+            if (!pProcess->pProcessName)
+                continue;
+
+            if (_wcsicmp(L"winlogon.exe", pProcess->pProcessName) != 0)
+                continue;
+
+            if (!pProcess->pUserSid)
+                continue;
+
+            if (!IsWellKnownSid(
+                pProcess->pUserSid, WELL_KNOWN_SID_TYPE::WinLocalSystemSid))
+                continue;
+
+            *ProcessId = pProcess->ProcessId;
+            return S_OK;
         }
-
-        // 如果没找到进程，则返回错误
-        if (dwWinLogonPID == -1)
-        {
-            SetLastError(ERROR_NOT_FOUND);
-            break;
-        }
-
-        // 复制进程令牌
-        result = NSudoDuplicateProcessToken(
-            dwWinLogonPID,
-            dwDesiredAccess,
-            lpTokenAttributes,
-            ImpersonationLevel,
-            TokenType,
-            phToken);
-
-    } while (false);
-
-    return result;
-}
-
-/*
-NSudoDuplicateServiceToken函数根据服务名获取一个服务进程令牌的副本。
-The NSudoDuplicateServiceToken function obtains a copy of service process
-token via service name.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoDuplicateServiceToken(
-    _In_ LPCWSTR lpServiceName,
-    _In_ DWORD dwDesiredAccess,
-    _In_opt_ LPSECURITY_ATTRIBUTES lpTokenAttributes,
-    _In_ SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
-    _In_ TOKEN_TYPE TokenType,
-    _Outptr_ PHANDLE phToken)
-{
-    BOOL result = FALSE;
-    SERVICE_STATUS_PROCESS ssStatus;
-
-    // 启动服务
-    result = NSudoStartService(lpServiceName, &ssStatus);
-    if (result)
-    {
-        // 复制进程令牌
-        result = NSudoDuplicateProcessToken(
-            ssStatus.dwProcessId,
-            dwDesiredAccess,
-            lpTokenAttributes,
-            ImpersonationLevel,
-            TokenType,
-            phToken);
     }
 
-    return result;
-}
-
-/*
-NSudoDuplicateSessionToken函数根据会话ID获取一个服务进程令牌的副本。
-The NSudoDuplicateSessionToken function obtains a copy of Session token via
-Session ID.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoDuplicateSessionToken(
-    _In_ DWORD dwSessionID,
-    _In_ DWORD dwDesiredAccess,
-    _In_opt_ LPSECURITY_ATTRIBUTES lpTokenAttributes,
-    _In_ SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
-    _In_ TOKEN_TYPE TokenType,
-    _Outptr_ PHANDLE phToken)
-{
-    BOOL result = FALSE;
-    M2::CHandle hToken;
-
-    // 打开会话令牌
-    result = WTSQueryUserToken(dwSessionID, &hToken);
-    if (result)
-    {
-        // 复制令牌
-        result = DuplicateTokenEx(
-            hToken,
-            dwDesiredAccess,
-            lpTokenAttributes,
-            ImpersonationLevel,
-            TokenType,
-            phToken);
-    }
-
-    return result;
+    return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
 }
 
 /*
@@ -724,25 +540,44 @@ information, call GetLastError.
 BOOL WINAPI NSudoImpersonateAsSystem()
 {
     BOOL result = FALSE;
-    M2::CHandle hToken;
 
-    // 获取当前会话SYSTEM用户令牌副本
-    result = NSudoDuplicateSystemToken(
-        MAXIMUM_ALLOWED,
-        nullptr,
-        SecurityImpersonation,
-        TokenImpersonation,
-        &hToken);
-    if (result)
+    DWORD dwSessionID = static_cast<DWORD>(-1);
+    DWORD dwWinLogonPID = static_cast<DWORD>(-1);
+
+    M2::CHandle OriginalToken;
+    M2::CHandle Token;
+
+    do
     {
-        // 启用令牌全部特权
-        result = NSudoSetTokenAllPrivileges(hToken, true);
+        result = NSudoGetCurrentProcessSessionID(&dwSessionID);
+        if (!result) break;
+
+        if (FAILED(M2QueryWinLogonProcessId(&dwWinLogonPID, dwSessionID)))
+            break;
+
+        M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
+        TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::ProcessId;
+        TokenSource.ProcessId = dwWinLogonPID;
+        if (FAILED(M2OpenProcessToken(
+            &OriginalToken, &TokenSource, MAXIMUM_ALLOWED)))
+            break;
+
+        result = DuplicateTokenEx(
+            OriginalToken,
+            MAXIMUM_ALLOWED,
+            nullptr,
+            SecurityImpersonation,
+            TokenImpersonation,
+            &Token);
+        if (!result) break;
+
+        result = NSudoSetTokenAllPrivileges(Token, true);
         if (result)
         {
-            // 模拟令牌
-            result = SetThreadToken(nullptr, hToken);
+            result = SetThreadToken(nullptr, Token);
         }
-    }
+
+    } while (false);
 
     return result;
 }
@@ -789,37 +624,44 @@ bool NSudoCreateProcess(
     BOOL result = FALSE;
 
     M2::CHandle hCurrentToken;
-    if (OpenProcessToken(
-        GetCurrentProcess(),
-        MAXIMUM_ALLOWED,
-        &hCurrentToken))
+    M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
+    TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::Current;
+    if (SUCCEEDED(M2OpenProcessToken(
+        &hCurrentToken, &TokenSource, MAXIMUM_ALLOWED)))
     {
         if (CreateEnvironmentBlock(&lpEnvironment, hCurrentToken, TRUE))
         {
-            result = CreateProcessAsUserW(
-                hToken,
-                nullptr,
-                const_cast<LPWSTR>(NSudoExpandEnvironmentStrings(lpCommandLine).c_str()),
-                nullptr,
-                nullptr,
-                FALSE,
-                dwCreationFlags,
-                lpEnvironment,
-                lpCurrentDirectory,
-                &StartupInfo,
-                &ProcessInfo);
+            std::wstring ExpandedString;
 
-            if (result)
+            if (SUCCEEDED(M2ExpandEnvironmentStrings(
+                ExpandedString,
+                lpCommandLine)))
             {
-                SetPriorityClass(ProcessInfo.hProcess, ProcessPriority);
+                result = CreateProcessAsUserW(
+                    hToken,
+                    nullptr,
+                    const_cast<LPWSTR>(ExpandedString.c_str()),
+                    nullptr,
+                    nullptr,
+                    FALSE,
+                    dwCreationFlags,
+                    lpEnvironment,
+                    lpCurrentDirectory,
+                    &StartupInfo,
+                    &ProcessInfo);
 
-                ResumeThread(ProcessInfo.hThread);
+                if (result)
+                {
+                    SetPriorityClass(ProcessInfo.hProcess, ProcessPriority);
 
-                WaitForSingleObjectEx(
-                    ProcessInfo.hProcess, WaitInterval, FALSE);
+                    ResumeThread(ProcessInfo.hThread);
 
-                CloseHandle(ProcessInfo.hProcess);
-                CloseHandle(ProcessInfo.hThread);
+                    WaitForSingleObjectEx(
+                        ProcessInfo.hProcess, WaitInterval, FALSE);
+
+                    M2CloseHandle(ProcessInfo.hProcess);
+                    M2CloseHandle(ProcessInfo.hThread);
+                }
             }
 
             DestroyEnvironmentBlock(lpEnvironment);
@@ -872,11 +714,10 @@ private:
             L"String",
             MAKEINTRESOURCEW(uID))))
         {
-            std::string RawString(
-                reinterpret_cast<const char*>(ResourceInfo.Pointer),
-                ResourceInfo.Size);
             // Raw string without the UTF-8 BOM. (0xEF,0xBB,0xBF)	
-            return M2MakeUTF16String(RawString.c_str() + 3);
+            return M2MakeUTF16String(std::string(
+                reinterpret_cast<const char*>(ResourceInfo.Pointer) + 3,
+                ResourceInfo.Size - 3));
         }
 
         return L"";
@@ -930,6 +771,8 @@ public:
     }
 };
 
+#include <stdio.h>
+
 class CNSudoShortCutAdapter
 {
 public:
@@ -939,24 +782,21 @@ public:
     {
         ShortCutList.clear();
 
-        try
+        FILE* FileStream = nullptr;
+
+        if (_wfopen_s(&FileStream, ShortCutListPath.c_str(), L"r") == 0
+            && FileStream)
         {
-            std::ifstream FileStream(ShortCutListPath);
-            if (FileStream.is_open())
+            nlohmann::json ConfigJSON = nlohmann::json::parse(FileStream);
+
+            for (auto& Item : ConfigJSON["ShortCutList_V2"].items())
             {
-                nlohmann::json ConfigJSON = nlohmann::json::parse(FileStream);
-
-                for (auto& Item : ConfigJSON["ShortCutList_V2"].items())
-                {
-                    ShortCutList.insert(std::make_pair(
-                        M2MakeUTF16String(Item.key()),
-                        M2MakeUTF16String(Item.value())));
-                }
+                ShortCutList.insert(std::make_pair(
+                    M2MakeUTF16String(Item.key()),
+                    M2MakeUTF16String(Item.value())));
             }
-        }
-        catch (const std::exception&)
-        {
 
+            fclose(FileStream);
         }
     }
 
@@ -974,12 +814,7 @@ public:
     {
         auto iterator = ShortCutList.find(CommandLine);
 
-        if (iterator == ShortCutList.end())
-        {
-            return CommandLine;       
-        }
-
-        return iterator->second;
+        return iterator == ShortCutList.end() ? CommandLine : iterator->second;
     }
 };
 
@@ -997,7 +832,7 @@ private:
     std::map<std::wstring, std::wstring> m_ShortCutList;
 
     bool m_IsElevated = false;
-    HANDLE m_OriginalCurrentProcessToken;
+    HANDLE m_OriginalCurrentProcessToken = INVALID_HANDLE_VALUE;
 
 public:
     const HINSTANCE& Instance = this->m_Instance;
@@ -1041,10 +876,10 @@ public:
 
             M2::CHandle CurrentProcessToken;
 
-            if (OpenProcessToken(
-                GetCurrentProcess(),
-                MAXIMUM_ALLOWED,
-                &CurrentProcessToken))
+            M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
+            TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::Current;
+            if (SUCCEEDED(M2OpenProcessToken(
+                &CurrentProcessToken, &TokenSource, MAXIMUM_ALLOWED)))
             {
                 if (DuplicateTokenEx(
                     CurrentProcessToken,
@@ -1069,7 +904,7 @@ public:
     {
         if (INVALID_HANDLE_VALUE != this->m_OriginalCurrentProcessToken)
         {
-            CloseHandle(this->m_OriginalCurrentProcessToken);
+            M2CloseHandle(this->m_OriginalCurrentProcessToken);
         }
     }
 
@@ -1093,7 +928,7 @@ typedef struct _NSUDO_CONTEXT_MENU_ITEM
     std::wstring ItemName;
     std::wstring ItemDescription;
     std::wstring ItemCommandParameters;
-    bool HasLUAShield;
+    bool HasLUAShield = false;
 } NSUDO_CONTEXT_MENU_ITEM, *PNSUDO_CONTEXT_MENU_ITEM;
 
 class CNSudoContextMenuAdapter
@@ -1176,7 +1011,7 @@ public:
         CNSudoContextMenuAdapter::Load(this->m_ContextMenuItems);
     }
 
-    DWORD Install()
+    HRESULT Install()
     {
         if (ERROR_SUCCESS != this->m_ConstructorError)
             return this->m_ConstructorError;
@@ -1186,7 +1021,7 @@ public:
             this->m_NSudoPath.c_str(),
             FALSE);
 
-        DWORD dwError = ERROR_SUCCESS;
+        HRESULT hr = S_OK;
 
         std::wstring NSudoPathWithQuotation =
             std::wstring(L"\"") + this->m_NSudoPath + L"\"";
@@ -1202,25 +1037,25 @@ public:
                 L"-ShowWindowMode=Hide" + L" " +
                 L"cmd /c start \"NSudo.ContextMenu.Launcher\" " + L"\"%1\"";
 
-            dwError = CreateCommandStoreItem(
+            hr = CreateCommandStoreItem(
                 this->m_CommandStoreRoot,
                 Item.ItemName.c_str(),
                 Item.ItemDescription.c_str(),
                 GeneratedItemCommand.c_str(),
                 Item.HasLUAShield);
-            if (ERROR_SUCCESS != dwError)
-                return dwError;
+            if (FAILED(hr))
+                return hr;
 
             SubCommands += Item.ItemName + L";";
         }
 
-        dwError = M2RegCreateKey(
+        hr = M2RegCreateKey(
             HKEY_CLASSES_ROOT,
             L"*\\shell\\NSudo",
             KEY_ALL_ACCESS | KEY_WOW64_64KEY,
             &hNSudoItem);
-        if (ERROR_SUCCESS != dwError)
-            return dwError;
+        if (FAILED(hr))
+            return hr;
 
         struct
         {
@@ -1245,16 +1080,16 @@ public:
 
         for (size_t i = 0; i < sizeof(ValueList) / sizeof(*ValueList); ++i)
         {
-            dwError = M2RegSetStringValue(
+            hr = M2RegSetStringValue(
                 hNSudoItem,
                 ValueList[i].lpValueName,
                 ValueList[i].lpValueData);
-            if (ERROR_SUCCESS != dwError)
-                return dwError;
+            if (FAILED(hr))
+                return hr;
 
         }
 
-        return dwError;
+        return hr;
     }
 
     DWORD Uninstall()
@@ -1262,12 +1097,25 @@ public:
         if (ERROR_SUCCESS != this->m_ConstructorError)
             return this->m_ConstructorError;
 
-        // 首先去除只读，然后删除文件，如果失败，则要求系统重启后删除
-        DWORD AttributesBackup = GetFileAttributesW(this->m_NSudoPath.c_str());
-        SetFileAttributesW(
+        // 首先尝试先去除只读，然后删除文件
+        HANDLE hFile = INVALID_HANDLE_VALUE;
+        HRESULT hr = M2CreateFile(
+            &hFile,
             this->m_NSudoPath.c_str(),
-            AttributesBackup & (-1 ^ FILE_ATTRIBUTE_READONLY));
-        if (!DeleteFileW(this->m_NSudoPath.c_str()))
+            SYNCHRONIZE | DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+            nullptr);
+        if (SUCCEEDED(hr))
+        {
+            hr = M2DeleteFileIgnoreReadonlyAttribute(hFile);
+            M2CloseHandle(hFile);
+        }
+
+        // 如果失败，则要求系统重启后删除
+        if (FAILED(hr))
         {
             MoveFileExW(
                 this->m_NSudoPath.c_str(),
@@ -1331,7 +1179,7 @@ NSUDO_MESSAGE NSudoCommandLineParser(
                 if (0 == _wcsicmp(OptionAndParameter.first.c_str(), L"Install"))
                 {
                     // 如果参数是 /Install 或 -Install，则安装NSudo到系统
-                    if (ERROR_SUCCESS != ContextMenuManagement.Install())
+                    if (FAILED(ContextMenuManagement.Install()))
                     {
                         ContextMenuManagement.Uninstall();
                     }
@@ -1584,49 +1432,45 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         return NSUDO_MESSAGE::INVALID_COMMAND_PARAMETER;
     }
 
+    M2::CHandle OriginalToken;
+
     if (NSudoOptionUserValue::TrustedInstaller == UserMode)
     {
-        if (!NSudoDuplicateServiceToken(
-            L"TrustedInstaller",
-            MAXIMUM_ALLOWED,
-            nullptr,
-            SecurityIdentification,
-            TokenPrimary,
-            &hToken))
+        SERVICE_STATUS_PROCESS ssStatus;
+
+        if (FAILED(M2StartService(L"TrustedInstaller", &ssStatus)))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
 
-        if (!SetTokenInformation(
-            hToken,
-            TokenSessionId,
-            (PVOID)&dwSessionID,
-            sizeof(DWORD)))
+        M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
+        TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::ProcessId;
+        TokenSource.ProcessId = ssStatus.dwProcessId;
+        if (FAILED(M2OpenProcessToken(&OriginalToken, &TokenSource, MAXIMUM_ALLOWED)))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
     else if (NSudoOptionUserValue::System == UserMode)
     {
-        if (!NSudoDuplicateSystemToken(
-            MAXIMUM_ALLOWED,
-            nullptr,
-            SecurityIdentification,
-            TokenPrimary,
-            &hToken))
+        DWORD dwWinLogonPID = static_cast<DWORD>(-1);
+
+        if (FAILED(M2QueryWinLogonProcessId(&dwWinLogonPID, dwSessionID)))
+        {
+            return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
+        }
+
+        M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
+        TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::ProcessId;
+        TokenSource.ProcessId = dwWinLogonPID;
+        if (FAILED(M2OpenProcessToken(&OriginalToken, &TokenSource, MAXIMUM_ALLOWED)))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
     else if (NSudoOptionUserValue::CurrentUser == UserMode)
     {
-        if (!NSudoDuplicateSessionToken(
-            dwSessionID,
-            MAXIMUM_ALLOWED,
-            nullptr,
-            SecurityIdentification,
-            TokenPrimary,
-            &hToken))
+        if (!WTSQueryUserToken(dwSessionID, &OriginalToken))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
@@ -1639,7 +1483,7 @@ NSUDO_MESSAGE NSudoCommandLineParser(
             nullptr,
             SecurityIdentification,
             TokenPrimary,
-            &hToken))
+            &OriginalToken))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
@@ -1657,10 +1501,30 @@ NSUDO_MESSAGE NSudoCommandLineParser(
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
 
-        if (!NSudoCreateLUAToken(&hToken, hTempToken))
+        if (!NSudoCreateLUAToken(&OriginalToken, hTempToken))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
+    }
+
+    if (!DuplicateTokenEx(
+        OriginalToken,
+        MAXIMUM_ALLOWED,
+        nullptr,
+        SecurityIdentification,
+        TokenPrimary,
+        &hToken))
+    {
+        return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
+    }
+
+    if (!SetTokenInformation(
+        hToken,
+        TokenSessionId,
+        (PVOID)&dwSessionID,
+        sizeof(DWORD)))
+    {
+        return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
     }
 
     if (NSudoOptionPrivilegesValue::EnableAllPrivileges == PrivilegesMode)
@@ -1794,7 +1658,7 @@ void NSudoPrintMsg(
         (DWORD)DialogContent.size(),
         &NumberOfCharsWritten,
         nullptr);
-#elif defined(NSUDO_CUI_WINDOWS) || defined(NSUDO_GUI_WINDOWS)
+#elif defined(NSUDO_GUI_WINDOWS)
     M2MessageDialog(
         hInstance,
         hWnd,
@@ -1824,7 +1688,7 @@ HRESULT NSudoShowAboutDialog(
         (DWORD)DialogContent.size(),
         &NumberOfCharsWritten,
         nullptr);
-#elif defined(NSUDO_CUI_WINDOWS) || defined(NSUDO_GUI_WINDOWS)
+#elif defined(NSUDO_GUI_WINDOWS)
     M2MessageDialog(
         g_ResourceManagement.Instance,
         hwndParent,
@@ -1833,36 +1697,10 @@ HRESULT NSudoShowAboutDialog(
         DialogContent.c_str());
 #endif
 
-    return M2GetLastError();
+    return M2GetLastHResultError();
 }
 
 #if defined(NSUDO_GUI_WINDOWS)
-
-#include <ShellScalingApi.h>
-
-inline HRESULT GetDpiForMonitorInternal(
-    _In_ HMONITOR hmonitor,
-    _In_ MONITOR_DPI_TYPE dpiType,
-    _Out_ UINT *dpiX,
-    _Out_ UINT *dpiY)
-{
-    HMODULE hModule = nullptr;
-    decltype(GetDpiForMonitor)* pFunc = nullptr;
-    HRESULT hr = E_NOINTERFACE;
-
-    hModule = LoadLibraryW(L"SHCore.dll");
-    if (!hModule) return M2GetLastError();
-
-    pFunc = reinterpret_cast<decltype(pFunc)>(
-        GetProcAddress(hModule, "GetDpiForMonitor"));
-    if (!pFunc) return M2GetLastError();
-
-    hr = pFunc(hmonitor, dpiType, dpiX, dpiY);
-
-    FreeLibrary(hModule);
-
-    return hr;
-}
 
 #include <atlbase.h>
 #include <atlwin.h>
@@ -1964,7 +1802,7 @@ private:
 
         HRESULT hr = E_FAIL;
 
-        hr = GetDpiForMonitorInternal(
+        hr = M2GetDpiForMonitor(
             MonitorFromWindow(this->m_hWnd, MONITOR_DEFAULTTONEAREST),
             MDT_EFFECTIVE_DPI, (UINT*)&this->m_xDPI, (UINT*)&this->m_yDPI);
         if (hr != S_OK)
@@ -2316,9 +2154,9 @@ private:
 
         buffer[0] = L'\"';
 
-        auto length = DragQueryFileW(
+        UINT length = DragQueryFileW(
             (HDROP)wParam, 0, &buffer[1], (int)(buffer.size() - 2));
-        buffer.resize(length + 1);
+        buffer.resize(static_cast<size_t>(length) + 1);
 
         if (!(GetFileAttributesW(&buffer[1]) & FILE_ATTRIBUTE_DIRECTORY))
         {
@@ -2339,6 +2177,8 @@ int NSudoMain()
     //SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 
     //SetThreadUILanguage(MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL));
+
+    //SetThreadUILanguage(1033);
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
@@ -2362,7 +2202,7 @@ int NSudoMain()
 
     if (OptionsAndParameters.empty() && UnresolvedCommandLine.empty())
     {
-#if defined(NSUDO_CUI_CONSOLE) || defined(NSUDO_CUI_WINDOWS)
+#if defined(NSUDO_CUI_CONSOLE)
         NSudoShowAboutDialog(nullptr);
 #elif defined(NSUDO_GUI_WINDOWS)
         CNSudoMainWindow MainWindow;
@@ -2378,7 +2218,7 @@ int NSudoMain()
         ApplicationName,
         OptionsAndParameters,
         UnresolvedCommandLine);
-#elif defined(NSUDO_CUI_WINDOWS) || defined(NSUDO_GUI_WINDOWS)
+#elif defined(NSUDO_GUI_WINDOWS)
     NSUDO_MESSAGE message = NSudoCommandLineParser(
         g_ResourceManagement.IsElevated,
         true,
@@ -2415,7 +2255,7 @@ int NSudoMain()
 
 #if defined(NSUDO_CUI_CONSOLE)
 int main()
-#elif defined(NSUDO_CUI_WINDOWS) || defined(NSUDO_GUI_WINDOWS)
+#elif defined(NSUDO_GUI_WINDOWS)
 int WINAPI wWinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -2423,7 +2263,7 @@ int WINAPI wWinMain(
     _In_ int nShowCmd)
 #endif
 {
-#if defined(NSUDO_CUI_WINDOWS) || defined(NSUDO_GUI_WINDOWS)
+#if defined(NSUDO_GUI_WINDOWS)
     UNREFERENCED_PARAMETER(hInstance);
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);

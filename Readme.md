@@ -1,40 +1,73 @@
 ﻿![Logo](Logo.png)
 # NSudo - A Powerful System Administration Tool
 
-[![appveyor.badge]][appveyor.link] 
-[![release.badge]][release.link]
-[![latestdownloads.badge]][latestdownloads.link]
-[![totaldownloads.badge]][totaldownloads.link]
-[![license.badge]][license.link]
-
-- [简体中文](自述.md)
-- [繁體中文](說明.md)
+[![AppVeyor](https://ci.appveyor.com/api/projects/status/github/M2Team/NSudo?branch=master&svg=true)](https://ci.appveyor.com/project/MouriNaruto/nsudo)
+[![Latest release](https://img.shields.io/github/release/M2Team/NSudo.svg)](https://github.com/M2Team/NSudo/releases/latest)
+[![Latest release downloads](https://img.shields.io/github/downloads/M2Team/NSudo/latest/total.svg)](https://github.com/M2Team/NSudo/releases/latest)
+[![Total downloads](https://img.shields.io/github/downloads/M2Team/NSudo/total.svg)](https://github.com/M2Team/NSudo/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](License.md)
+[![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FM2Team%2FNSudo.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FM2Team%2FNSudo?ref=badge_shield)
 
 ![Screenshot](Screenshot.png)
 
-- Notice: NSudo is based on SuperCMD by Raymai97.Visit 
-  [here](http://bbs.pcbeta.com/viewthread-1508863-1-1.html "here") for more 
-  information about SuperCMD.
+- Languages
+  - [English](Readme.md)
+  - [简体中文](自述.md)
+  - [繁體中文](說明.md)
+- [About](#about)
+  - [Prototype Project](#prototype)
+  - [Third-party introduction](#third-party-introduction)
+  - [System requirements](#system-requirements)
+- [Usage](#usage)
+  - [Quick Start](#quick-start)
+  - [Command Line](#command-line)
+  - [Shortcut List](#shortcut-list)
+- Documents
+  - [Changelog](Changelog.md)
+  - [Relevant People](People.md)
+  - [Code of Conduct](CODE_OF_CONDUCT.md)
+  - [Contributing to NSudo](CONTRIBUTING.md)
+- Source repositories
+  - [GitHub (Main)](https://github.com/M2Team/NSudo)
+  - [Gitee (Mirror)](https://gitee.com/M2-Team/NSudo)
+- Communities
+  - [GitHub](https://github.com/M2Team/NSudo/issues)
+  - [MDL](https://forums.mydigitallife.net/threads/59268/)
+  - [52pojie](https://www.52pojie.cn/thread-847059-1-1.html)
+- Contact
+  - [E-mail](mailto:Mouri_Naruto@Outlook.com)
 
-## Introduction
-I will give you some thirdparty introduction links because I am not good at 
-English.
+
+## About
+
+### Prototype
+
+NSudo is based on SuperCMD by Raymai97. Visit 
+[here](http://bbs.pcbeta.com/viewthread-1508863-1-1.html "here") for more 
+information about SuperCMD.
+
+### Third-party introduction
 - MajorGeeks: https://www.majorgeeks.com/files/details/nsudo.html
 - softpedia.com: https://www.softpedia.com/get/Tweak/System-Tweak/NSudo.shtml
 - TrishTech.com: https://www.trishtech.com/2018/11/nsudo-run-programs-with-full-privileges-in-windows/
 - Wilders Security Forums: https://www.wilderssecurity.com/threads/396818
 
-## System Requirements
+### System requirements
 - Supported OS Version: Windows NT 6.0 or later
 - Supported CPU Architecture: x86, x86-64(AMD64), ARM, ARM64
 
-## Usage
-- Please go to the [CPU Architecture] folder and click NSudo.exe. Follow the 
-  prompts.
-  - For example, if you want to use 64-bit NSudo on your Intel or AMD device,
-    you need to go to the x64 folder and click NSudo.exe
 
-## Command Line Options
+## Usage
+
+### Quick Start
+
+Please go to the [CPU Architecture] folder and click NSudo.exe. Follow the 
+prompts. For example, if you want to use 64-bit NSudo on your Intel or AMD 
+device, you need to go to the x64 folder and click NSudoG.exe
+
+### Command Line
+
 ```
 Format: NSudo [ Options and parameters ] Command line or ShortCut Command
 
@@ -118,12 +151,22 @@ Example:
     privileges and the default Integrity Level.
         NSudo -U:T -P:E cmd
 ```
+
 Example：If you want to run Command Prompt with TrustedInstaller, enable all 
-privileges and the default Integrity Level
+privileges and the default Integrity Level:
+
 > NSudo -U:T -P:E cmd
+
+Starting from NSudo 5.0.1708.16, the command line nested quotes is supported. 
+For example: 
+
+> NSudo -U:T cmd /c "dir "C:\Program Files" & pause"
+
+### Shortcut List
 
 You can edit NSudo.json to custom the Shortcut list, here are the demo 
 (NSudo.json in the NSudo.exe's folder):
+
 ```
 {
   "ShortCutList_V2": {
@@ -135,44 +178,3 @@ You can edit NSudo.json to custom the Shortcut list, here are the demo
   }
 }
 ```
-Starting from NSudo 5.0.1708.16, the command line nested quotes is supported. 
-For example: 
-> NSudo -U:T cmd /c "dir "C:\Program Files" & pause"
-
-## 3rd-party libraries which used
-- JSON for Modern C++
-  - Copyright: Niels Lohmann
-  - License: https://github.com/nlohmann/json/blob/develop/LICENSE.MIT
-- (Optional) VC-LTL
-  - Copyright: Chuyu Team
-  - License: https://github.com/Chuyu-Team/VC-LTL/blob/master/LICENSE.txt
-
-## Git Repositories
-- GitHub (Main)
-  - https://github.com/M2Team/NSudo
-- OSChina (Mirrors)
-  - https://gitee.com/M2-Team/NSudo
-
-## Documents
-- [NSudo's Changelog](Changelog.md)
-- [NSudo's Relevant People](People.md)
-- [NSudo's Code of Conduct](CODE_OF_CONDUCT.md)
-- [Contributing to NSudo](CONTRIBUTING.md)
-
-## Communication
-- MDL Post: https://forums.mydigitallife.net/threads/59268/
-- 52pojie Post: https://www.52pojie.cn/thread-847059-1-1.html
-- E-mail: Mouri_Naruto@Outlook.com
-
-## Have a good time -- M2-Team
-
-[appveyor.badge]: https://ci.appveyor.com/api/projects/status/github/M2Team/NSudo?branch=master&svg=true
-[appveyor.link]: https://ci.appveyor.com/project/MouriNaruto/nsudo
-[release.badge]: https://img.shields.io/github/release/M2Team/NSudo.svg
-[release.link]: https://github.com/M2Team/NSudo/releases/latest
-[latestdownloads.badge]: https://img.shields.io/github/downloads/M2Team/NSudo/latest/total.svg
-[latestdownloads.link]: https://github.com/M2Team/NSudo/releases/latest
-[totaldownloads.badge]: https://img.shields.io/github/downloads/M2Team/NSudo/total.svg
-[totaldownloads.link]: https://github.com/M2Team/NSudo/releases
-[license.badge]: https://img.shields.io/github/license/M2Team/NSudo.svg
-[license.link]: LICENSE
