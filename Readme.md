@@ -1,180 +1,110 @@
-﻿![Logo](Logo.png)
-# NSudo - A Powerful System Administration Tool
+﻿# ![Logo](Logo.png) NSudo - A Powerful System Administration Tool
 
-[![AppVeyor](https://ci.appveyor.com/api/projects/status/github/M2Team/NSudo?branch=master&svg=true)](https://ci.appveyor.com/project/MouriNaruto/nsudo)
-[![Latest release](https://img.shields.io/github/release/M2Team/NSudo.svg)](https://github.com/M2Team/NSudo/releases/latest)
-[![Latest release downloads](https://img.shields.io/github/downloads/M2Team/NSudo/latest/total.svg)](https://github.com/M2Team/NSudo/releases/latest)
-[![Total downloads](https://img.shields.io/github/downloads/M2Team/NSudo/total.svg)](https://github.com/M2Team/NSudo/releases)
+[![AppVeyor CI](https://ci.appveyor.com/api/projects/status/github/M2Team/NSudo?branch=master&svg=true)](https://ci.appveyor.com/project/MouriNaruto/nsudo)
+[![Latest Version](https://img.shields.io/github/release/M2Team/NSudo.svg)](https://github.com/M2Team/NSudo/releases/latest)
+[![Latest Release Downloads](https://img.shields.io/github/downloads/M2Team/NSudo/latest/total.svg)](https://github.com/M2Team/NSudo/releases/latest)
+[![Total Downloads](https://img.shields.io/github/downloads/M2Team/NSudo/total.svg)](https://github.com/M2Team/NSudo/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](License.md)
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FM2Team%2FNSudo.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FM2Team%2FNSudo?ref=badge_shield)
 
-![Screenshot](Screenshot.png)
+This is the source code repository of NSudo. If you wonder to visit the NSudo 
+official website, download NSudo or read the NSudo documents etc, please visit
+https://m2team.github.io/NSudo.
 
-- Languages
-  - [English](Readme.md)
-  - [简体中文](自述.md)
-  - [繁體中文](說明.md)
-- [About](#about)
-  - [Prototype Project](#prototype)
-  - [Third-party introduction](#third-party-introduction)
-  - [System requirements](#system-requirements)
-- [Usage](#usage)
-  - [Quick Start](#quick-start)
-  - [Command Line](#command-line)
-  - [Shortcut List](#shortcut-list)
-- Documents
-  - [Changelog](Changelog.md)
-  - [Relevant People](People.md)
-  - [Code of Conduct](CODE_OF_CONDUCT.md)
-  - [Contributing to NSudo](CONTRIBUTING.md)
-- Source repositories
-  - [GitHub (Main)](https://github.com/M2Team/NSudo)
-  - [Gitee (Mirror)](https://gitee.com/M2-Team/NSudo)
-- Communities
-  - [GitHub](https://github.com/M2Team/NSudo/issues)
-  - [MDL](https://forums.mydigitallife.net/threads/59268/)
-  - [52pojie](https://www.52pojie.cn/thread-847059-1-1.html)
-- Contact
-  - [E-mail](mailto:Mouri_Naruto@Outlook.com)
+This readme file will be the developer oriented document because this it is 
+under the source code repository.
 
+## 3rd-party libraries which used
 
-## About
+- JSON for Modern C++
+  - Copyright: Niels Lohmann
+  - License: https://github.com/nlohmann/json/blob/develop/LICENSE.MIT
+- (Optional) VC-LTL
+  - Copyright: Chuyu Team
+  - License: https://github.com/Chuyu-Team/VC-LTL/blob/master/LICENSE.txt
 
-### Prototype
+## Code of Conduct
 
-NSudo is based on SuperCMD by Raymai97. Visit 
-[here](http://bbs.pcbeta.com/viewthread-1508863-1-1.html "here") for more 
-information about SuperCMD.
+Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-### Third-party introduction
-- MajorGeeks: https://www.majorgeeks.com/files/details/nsudo.html
-- softpedia.com: https://www.softpedia.com/get/Tweak/System-Tweak/NSudo.shtml
-- TrishTech.com: https://www.trishtech.com/2018/11/nsudo-run-programs-with-full-privileges-in-windows/
-- Wilders Security Forums: https://www.wilderssecurity.com/threads/396818
+## Contributing to NSudo
 
-### System requirements
-- Supported OS Version: Windows NT 6.0 or later
-- Supported CPU Architecture: x86, x86-64(AMD64), ARM, ARM64
+### How to become a contributor
 
+- Direct contributions
+  - **Create pull requests directly.**
+  - Please send e-mails to Mouri_Naruto@Outlook.com if you have any
+    questions.
+- Feedback suggestions and bugs.
+  - We use GitHub issues to track bugs and features.
+  - For bugs and general issues please 
+    [file a new issue](https://github.com/M2Team/NSudo/issues/new).
 
-## Usage
+### Code contribution guidelines
 
-### Quick Start
+#### Prerequisites
 
-Please go to the [CPU Architecture] folder and click NSudo.exe. Follow the 
-prompts. For example, if you want to use 64-bit NSudo on your Intel or AMD 
-device, you need to go to the x64 folder and click NSudoG.exe
+- Visual Studio 2017 version 15.9 or later.
+  - Install from here: http://visualstudio.com/downloads
+  - You also need install ARM and ARM64 components.
+- Windows 10 version 1507 SDK or later.
+  - You need to change the Windows SDK version in the project properties if the
+    version of Windows 10 SDK I used isn't installed on your PC.
+  - You also need install ARM and ARM64 components when you installing the 
+    Windows 10 Version 1703 SDK or later.
+- (Optional but recommend) If you want to reduce the release mode binaries size
+  for x86, x64 and ARM64 port of NSudo, you can use VC-LTL.
+  - VC-LTL GitHub Repository: https://github.com/Chuyu-Team/VC-LTL
+  - How to use VC-LTL to optimize NSudo binaries size:
+    - Download VC-LTL binary pack from 
+	  https://github.com/Chuyu-Team/VC-LTL/releases/latest.
+    - Unpack the VC-LTL binary pack and double-click install.cmd in the unpack
+	  folder.
 
-### Command Line
+#### Code style and conventions
 
-```
-Format: NSudo [ Options and parameters ] Command line or ShortCut Command
+- C++: [C++ Core Guidelines](https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md)
+- C#: Follow the .NET Core team's [C# coding style](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/coding-style.md)
 
-Options:
+For all languages respect the [.editorconfig](https://editorconfig.org/) file 
+specified in the source tree. Many IDEs natively support this or can with a 
+plugin.
 
--U:[ Option ] Create a process with specified user option.
-Available options:
-    T TrustedInstaller
-    S System
-    C Current User
-    P Current Process
-    D Current Process (Drop right)
-PS: This is a mandatory parameter.
+#### Copying files from other projects
 
--P:[ Option ] Create a process with specified privilege option. 
-Available options:
-    E Enable All Privileges
-    D Disable All Privileges
-PS: If you want to use the default privileges to create a process, please do 
-not include the "-P" parameter.
+The following rules must be followed for PRs that include files from another 
+project:
+* The license of the file is
+[permissive](https://en.wikipedia.org/wiki/Permissive_free_software_licence).
+* The license of the file is left intact.
+* The contribution is correctly attributed in the [Readme](Readme.md)
+file in the repository, as needed.
 
--M:[ Option ] Create a process with specified Integrity Level option.
-Available options:
-    S System
-    H High
-    M Medium
-    L Low
-PS: If you want to use the default Integrity Level to create a process, please 
-do not include the "-M" parameter.
+### How to update documents.
 
--Priority:[ Option ] Create a process with specified [rocess priority option.
-Available options:
-    Idle
-    BelowNormal
-    Normal
-    AboveNormal
-    High
-    RealTime
-PS: If you want to use the default Process Priority to create a process, please
-do not include the "-Priority" parameter.
+Refer to https://github.com/M2Team/NSudo/pull/29.
 
--ShowWindowMode:[ Option ] Create a process with specified window mode option.
-Available options:
-    Show
-    Hide
-    Maximize
-    Minimize
-PS: If you want to use the default window mode to create a process, please do 
-not include the "-ShowWindowMode" parameter.
+To build new docs, you'll need to have [Node.js](https://nodejs.org) and 
+[Yarn](https://yarnpkg.com) installed on your system, and run:
 
--Wait Make NSudo wait for the created process to end before exiting.
-PS: If you don't want to wait, please do not include the "-Wait" parameter.
-
--CurrentDirectory:[ DirectoryPath ] Set the current directory for the process.
-PS: If you want to use the NSudo's current directory, please do not include the
-"-CurrentDirectory" parameter.
-
--UseCurrentConsole Create a process with the current console window.
-PS: If you want to create a process with the new console window, please do not 
-include the "-UseCurrentConsole" parameter.
-
--Version Show version information of NSudo.
-
--? Show this content.
--H Show this content.
--Help Show this content.
-
-Context Menu:
-  -Install   Copy NSudo to the Windows directory and add the context menu.
-  -Uninstall Remove NSudo in the Windows directory and the context menu. 
-
-PS:
-    1. All NSudo command arguments is case-insensitive.
-    2. You can use the "/" or "--" override "-" and use the "=" override ":" in
-       the command line parameters.  For example, "/U:T" and "-U=T" are 
-       equivalent.
-    3. To ensure the best experience, NSudoC does not support context menu.
-
-Example:
-    If you want to run Command Prompt with TrustedInstaller, enable all 
-    privileges and the default Integrity Level.
-        NSudo -U:T -P:E cmd
+```sh
+# Install dependencies
+yarn
+# Run `build` in package.json
+yarn build
 ```
 
-Example：If you want to run Command Prompt with TrustedInstaller, enable all 
-privileges and the default Integrity Level:
+in `docs-src/`.
 
-> NSudo -U:T -P:E cmd
+Docs will be built into `docs`, where GitHub Pages treated as site root. So be
+sure to commit `docs` changes.
 
-Starting from NSudo 5.0.1708.16, the command line nested quotes is supported. 
-For example: 
+CI/CD is not included in this PR, so manual build is required after every docs
+update. `yarn dev` runs a local hot-reload-enabled docs server for easier 
+debugging.
 
-> NSudo -U:T cmd /c "dir "C:\Program Files" & pause"
+In the long run, using some 3rd-party static hosting like 
+[Netlify](https://netlify.com) would be easier to release docs.
 
-### Shortcut List
-
-You can edit NSudo.json to custom the Shortcut list, here are the demo 
-(NSudo.json in the NSudo.exe's folder):
-
-```
-{
-  "ShortCutList_V2": {
-
-    "Command Prompt": "cmd",
-    "PowerShell": "powershell",
-    "PowerShell ISE": "powershell_ise",
-    "Edit Hosts": "notepad %windir%\\System32\\Drivers\\etc\\hosts"
-  }
-}
-```
+Docs engine is based on [VuePress](https://v1.vuepress.vuejs.org).

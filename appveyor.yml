@@ -1,5 +1,5 @@
 ﻿version: CI Build {Build}
-image: Visual Studio 2019 Preview
+image: Visual Studio 2019
 configuration:
 - Debug - CUI
 - Debug - GUI
@@ -9,13 +9,15 @@ platform:
 - x86
 - x64
 before_build:
-- cmd: 'echo #define NSUDO_CI_BUILD L"(CI Build %APPVEYOR_BUILD_NUMBER%)" >> %APPVEYOR_BUILD_FOLDER%\NSudoSDK\CIBuild.h'
+- cmd: 'echo #define NSUDO_CI_BUILD L"(CI Build %APPVEYOR_BUILD_NUMBER%)" >> %APPVEYOR_BUILD_FOLDER%\NSudo\CIBuild.h'
 build:
   project: NSudo.sln
   verbosity: normal
 after_build:
 - cmd: >-
     7z a -r NSudo_CI_Build_%APPVEYOR_BUILD_NUMBER%.zip %APPVEYOR_BUILD_FOLDER%\Output\*.exe
+
+    7z a -r NSudo_CI_Build_%APPVEYOR_BUILD_NUMBER%.zip %APPVEYOR_BUILD_FOLDER%\Output\*.dll
 
     7z a -r NSudo_CI_Build_%APPVEYOR_BUILD_NUMBER%.zip %APPVEYOR_BUILD_FOLDER%\Output\*.pdb
 

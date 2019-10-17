@@ -8,19 +8,53 @@
  * DEVELOPER: Mouri_Naruto (Mouri_Naruto AT Outlook.com)
  */
 
-#include "stdafx.h"
+#define NOMINMAX
 
-#include <WtsApi32.h>
-#pragma comment(lib,"WtsApi32.lib")
+#pragma region targetver
 
- // 为编译通过而禁用的警告
+#include <SDKDDKVer.h>
+
+#define _WIN32_WINNT_WIN10_TH2 _WIN32_WINNT_WIN10
+#define _WIN32_WINNT_WIN10_RS1 _WIN32_WINNT_WIN10
+
+#pragma endregion
+
+#include "NSudoAPI.h"
+
+#include "M2WindowsHelpers.h"
+#include "M2Win32GUIHelpers.h"
+
+#include <commctrl.h>
+#include <Userenv.h>
+
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "Userenv.lib")
+
+#include <cstdio>
+#include <cwchar>
+#include <fstream>
+#include <map>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "json.hpp"
+
+//#include "jsmn.h"
+
+#if defined(NSUDO_GUI_WINDOWS)
+#include <atlbase.h>
+#include <atlwin.h>
+#endif
+
+#include "NSudoVersion.h"
+#include "Resources/resource.h"
+
+// 为编译通过而禁用的警告
 #if _MSC_VER >= 1200
 #pragma warning(push)
 #pragma warning(disable:4505) // 未引用的本地函数已移除(等级 4)
 #endif
-
-#include <string>
-
 
 std::wstring GetMessageByID(DWORD MessageID)
 {
@@ -44,639 +78,23 @@ std::wstring GetMessageByID(DWORD MessageID)
     return MessageString;
 }
 
-HRESULT M2RegSetStringValue(
-    _In_ HKEY hKey,
-    _In_opt_ LPCWSTR lpValueName,
-    _In_opt_ LPCWSTR lpValueData)
-{
-    if (!lpValueName || !lpValueData)
-        return __HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER);
-    
-    return M2RegSetValue(
-        hKey,
-        lpValueName,
-        0,
-        REG_SZ,
-        reinterpret_cast<CONST BYTE*>(lpValueData),
-        static_cast<DWORD>(wcslen(lpValueData) + 1) * sizeof(wchar_t));
-}
-
-HRESULT M2RegCreateKey(
-    _In_ HKEY hKey,
-    _In_ LPCWSTR lpSubKey,
-    _In_ REGSAM samDesired,
-    _Out_ PHKEY phkResult)
-{
-    return M2RegCreateKey(
-        hKey,
-        lpSubKey,
-        0,
-        nullptr,
-        REG_OPTION_NON_VOLATILE,
-        samDesired,
-        nullptr,
-        phkResult,
-        nullptr);
-}
-
-HRESULT CreateCommandStoreItem(
-    _In_ HKEY CommandStoreRoot,
-    _In_ LPCWSTR ItemName,
-    _In_ LPCWSTR ItemDescription,
-    _In_ LPCWSTR ItemCommand,
-    _In_ bool HasLUAShield)
-{
-    HRESULT hr = S_OK;
-    M2::CHKey hCommandStoreItem;
-    M2::CHKey hCommandStoreItemCommand;
-
-    hr = M2RegCreateKey(
-        CommandStoreRoot,
-        ItemName,
-        KEY_ALL_ACCESS | KEY_WOW64_64KEY,
-        &hCommandStoreItem);
-    if (FAILED(hr))
-        return hr;
-
-    hr = M2RegSetStringValue(
-        hCommandStoreItem,
-        L"",
-        ItemDescription);
-    if (FAILED(hr))
-        return hr;
-
-    if (HasLUAShield)
-    {
-        hr = M2RegSetStringValue(
-            hCommandStoreItem,
-            L"HasLUAShield",
-            L"");
-        if (FAILED(hr))
-            return hr;
-    }
-
-    hr = M2RegCreateKey(
-        hCommandStoreItem,
-        L"command",
-        KEY_ALL_ACCESS | KEY_WOW64_64KEY,
-        &hCommandStoreItemCommand);
-    if (FAILED(hr))
-        return hr;
-
-    hr = M2RegSetStringValue(
-        hCommandStoreItemCommand,
-        L"",
-        ItemCommand);
-    if (FAILED(hr))
-        return hr;
-
-
-    return hr;
-}
-
-/*
-   访问令牌特权定义
-   The definitions of the Token Privileges
-   */
-typedef enum _TOKEN_PRIVILEGES_LIST
-{
-    SeMinWellKnownPrivilege = 2,
-    SeCreateTokenPrivilege = 2,
-    SeAssignPrimaryTokenPrivilege,
-    SeLockMemoryPrivilege,
-    SeIncreaseQuotaPrivilege,
-    SeMachineAccountPrivilege,
-    SeTcbPrivilege,
-    SeSecurityPrivilege,
-    SeTakeOwnershipPrivilege,
-    SeLoadDriverPrivilege,
-    SeSystemProfilePrivilege,
-    SeSystemtimePrivilege,
-    SeProfileSingleProcessPrivilege,
-    SeIncreaseBasePriorityPrivilege,
-    SeCreatePagefilePrivilege,
-    SeCreatePermanentPrivilege,
-    SeBackupPrivilege,
-    SeRestorePrivilege,
-    SeShutdownPrivilege,
-    SeDebugPrivilege,
-    SeAuditPrivilege,
-    SeSystemEnvironmentPrivilege,
-    SeChangeNotifyPrivilege,
-    SeRemoteShutdownPrivilege,
-    SeUndockPrivilege,
-    SeSyncAgentPrivilege,
-    SeEnableDelegationPrivilege,
-    SeManageVolumePrivilege,
-    SeImpersonatePrivilege,
-    SeCreateGlobalPrivilege,
-    SeTrustedCredManAccessPrivilege,
-    SeRelabelPrivilege,
-    SeIncreaseWorkingSetPrivilege,
-    SeTimeZonePrivilege,
-    SeCreateSymbolicLinkPrivilege,
-    SeMaxWellKnownPrivilege = SeCreateSymbolicLinkPrivilege
-} TOKEN_PRIVILEGES_LIST, *PTOKEN_PRIVILEGES_LIST;
-
-/*
-访问令牌完整性级别定义
-The definitions of the Token Integrity Levels
-*/
-typedef enum _TOKEN_INTEGRITY_LEVELS_LIST
-{
-    // S-1-16-0
-    UntrustedLevel = SECURITY_MANDATORY_UNTRUSTED_RID,
-
-    // S-1-16-4096
-    LowLevel = SECURITY_MANDATORY_LOW_RID,
-
-    // S-1-16-8192
-    MediumLevel = SECURITY_MANDATORY_MEDIUM_RID,
-
-    // S-1-16-8448
-    MediumPlusLevel = SECURITY_MANDATORY_MEDIUM_PLUS_RID,
-
-    // S-1-16-12288
-    HighLevel = SECURITY_MANDATORY_HIGH_RID,
-
-    // S-1-16-16384
-    SystemLevel = SECURITY_MANDATORY_SYSTEM_RID,
-
-    // S-1-16-20480
-    ProtectedLevel = SECURITY_MANDATORY_PROTECTED_PROCESS_RID
-} TOKEN_INTEGRITY_LEVELS_LIST, *PTOKEN_INTEGRITY_LEVELS_LIST;
-
-// SECURITY_NT_AUTHORITY
-SID_IDENTIFIER_AUTHORITY SIA_NT = SECURITY_NT_AUTHORITY;
-
-// SECURITY_MANDATORY_LABEL_AUTHORITY
-SID_IDENTIFIER_AUTHORITY SIA_IL = SECURITY_MANDATORY_LABEL_AUTHORITY;
-
-/*
-NSudoGetCurrentProcessSessionID获取当前进程的会话ID。
-The NSudoGetCurrentProcessSessionID function obtains the Session ID of the
-current process.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoGetCurrentProcessSessionID(
-    _Out_ PDWORD SessionID)
-{
-    *SessionID = static_cast<DWORD>(-1);
-
-    BOOL result = FALSE;
-    M2::CHandle hToken;
-    DWORD ReturnLength = 0;
-
-    M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
-    TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::Current;
-    result = SUCCEEDED(M2OpenProcessToken(
-        &hToken, &TokenSource, MAXIMUM_ALLOWED));
-    if (result)
-    {
-        result = GetTokenInformation(
-            hToken,
-            TokenSessionId,
-            SessionID,
-            sizeof(DWORD),
-            &ReturnLength);
-    }
-
-    return result;
-}
-
-/*
-NSudoSetTokenPrivilege函数启用或禁用指定的访问令牌的指定特权。启用或禁用一
-个访问令牌的特权需要TOKEN_ADJUST_PRIVILEGES访问权限。
-The NSudoSetTokenPrivilege function enables or disables the specified
-privilege in the specified access token. Enabling or disabling privileges
-in an access token requires TOKEN_ADJUST_PRIVILEGES access.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoSetTokenPrivilege(
-    _In_ HANDLE hExistingToken,
-    _In_ TOKEN_PRIVILEGES_LIST Privilege,
-    _In_ bool bEnable)
-{
-    TOKEN_PRIVILEGES TP;
-
-    TP.PrivilegeCount = 1;
-    TP.Privileges[0].Luid.HighPart = 0;
-    TP.Privileges[0].Luid.LowPart = Privilege;
-    TP.Privileges[0].Attributes = (DWORD)(bEnable ? SE_PRIVILEGE_ENABLED : 0);
-
-    // 设置进程特权
-    return SUCCEEDED(M2AdjustTokenPrivileges(
-        hExistingToken, FALSE, &TP, 0, nullptr, nullptr));
-}
-
-/*
-NSudoSetTokenAllPrivileges函数启用或禁用指定的访问令牌的所有特权。启用或禁
-用一个访问令牌的特权需要TOKEN_ADJUST_PRIVILEGES访问权限。
-The NSudoSetTokenAllPrivileges function enables or disables all privileges
-in the specified access token. Enabling or disabling privileges in an
-access token requires TOKEN_ADJUST_PRIVILEGES access.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoSetTokenAllPrivileges(
-    _In_ HANDLE hExistingToken,
-    _In_ bool bEnable)
-{
-    BOOL result = FALSE;
-    M2::CM2Memory<PTOKEN_PRIVILEGES> pTPs;
-
-    result = SUCCEEDED(M2GetTokenInformation(
-        pTPs,
-        hExistingToken,
-        TokenPrivileges));
-    if (result)
-    {
-        // 设置特权信息
-        for (DWORD i = 0; i < pTPs->PrivilegeCount; ++i)
-            pTPs->Privileges[i].Attributes =
-            (DWORD)(bEnable ? SE_PRIVILEGE_ENABLED : 0);
-
-        // 设置进程特权
-        result = SUCCEEDED(M2AdjustTokenPrivileges(
-            hExistingToken, FALSE, pTPs, 0, nullptr, nullptr));
-    }
-
-    return result;
-}
-
-/*
-NSudoSetTokenIntegrityLevel函数为指定的访问令牌设置完整性标签。
-The NSudoSetTokenIntegrityLevel function sets the integrity level for the
-specified access token.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoSetTokenIntegrityLevel(
-    _In_ HANDLE TokenHandle,
-    _In_ TOKEN_INTEGRITY_LEVELS_LIST IL)
-{
-    BOOL result = FALSE;
-    TOKEN_MANDATORY_LABEL TML;
-    M2::CSID Sid;
-
-    // 初始化SID
-    result = AllocateAndInitializeSid(
-        &SIA_IL, 1, IL, 0, 0, 0, 0, 0, 0, 0, &Sid);
-    if (result)
-    {
-        // 初始化TOKEN_MANDATORY_LABEL
-        TML.Label.Attributes = SE_GROUP_INTEGRITY;
-        TML.Label.Sid = Sid;
-
-        // 设置令牌对象
-        result = SetTokenInformation(
-            TokenHandle, TokenIntegrityLevel, &TML, sizeof(TML));
-    }
-
-    return result;
-}
-
-
-
-/*
-NSudoCreateLUAToken函数从一个现有的访问令牌创建一个新的LUA访问令牌。
-The NSudoCreateLUAToken function creates a new LUA access token from an
-existing access token.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoCreateLUAToken(
-    _Out_ PHANDLE TokenHandle,
-    _In_ HANDLE ExistingTokenHandle)
-{
-    *TokenHandle = INVALID_HANDLE_VALUE;
-
-    BOOL result = FALSE;
-    DWORD Length = 0;
-    BOOL EnableTokenVirtualization = TRUE;
-    TOKEN_OWNER Owner = { 0 };
-    TOKEN_DEFAULT_DACL NewTokenDacl = { 0 };
-    M2::CHandle hToken;
-    M2::CM2Memory<PTOKEN_USER> pTokenUser;
-    M2::CM2Memory<PTOKEN_DEFAULT_DACL> pTokenDacl;
-    M2::CSID pAdminSid;
-    M2::CMemory<PACL> NewDefaultDacl;
-    PACCESS_ALLOWED_ACE pTempAce = nullptr;
-
-    //创建受限令牌
-    result = CreateRestrictedToken(
-        ExistingTokenHandle,
-        LUA_TOKEN,
-        0, nullptr,
-        0, nullptr,
-        0, nullptr,
-        &hToken);
-    if (!result) goto FuncEnd;
-
-    // 设置令牌完整性
-    result = NSudoSetTokenIntegrityLevel(
-        hToken, TOKEN_INTEGRITY_LEVELS_LIST::MediumLevel);
-    if (!result) goto FuncEnd;
-
-    // 获取令牌对应的用户账户SID信息
-    result = SUCCEEDED(M2GetTokenInformation(
-        pTokenUser,
-        hToken,
-        TokenUser));
-    if (!result) goto FuncEnd;
-
-    // 设置令牌Owner为当前用户
-    Owner.Owner = pTokenUser->User.Sid;
-    result = SetTokenInformation(
-        hToken, TokenOwner, &Owner, sizeof(TOKEN_OWNER));
-    if (!result) goto FuncEnd;
-
-    // 获取令牌的DACL信息
-    result = SUCCEEDED(M2GetTokenInformation(
-        pTokenDacl,
-        hToken,
-        TokenDefaultDacl));
-    if (!result) goto FuncEnd;
-
-    // 获取管理员组SID
-    result = AllocateAndInitializeSid(
-        &SIA_NT, 2,
-        SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS,
-        0, 0, 0, 0, 0, 0, &pAdminSid);
-    if (!result) goto FuncEnd;
-
-    // 计算新ACL大小
-    Length = pTokenDacl->DefaultDacl->AclSize;
-    Length += GetLengthSid(pTokenUser->User.Sid);
-    Length += sizeof(ACCESS_ALLOWED_ACE);
-
-    // 分配ACL结构内存
-    if (!NewDefaultDacl.Alloc(Length))
-    {
-        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        goto FuncEnd;
-    }
-    NewTokenDacl.DefaultDacl = NewDefaultDacl;
-
-    // 创建ACL
-    result = InitializeAcl(
-        NewTokenDacl.DefaultDacl,
-        Length,
-        pTokenDacl->DefaultDacl->AclRevision);
-    if (!result) goto FuncEnd;
-
-    // 添加ACE
-    result = AddAccessAllowedAce(
-        NewTokenDacl.DefaultDacl,
-        pTokenDacl->DefaultDacl->AclRevision,
-        GENERIC_ALL,
-        pTokenUser->User.Sid);
-    if (!result) goto FuncEnd;
-
-    // 复制ACE
-    for (ULONG i = 0;
-        GetAce(pTokenDacl->DefaultDacl, i, (PVOID*)&pTempAce);
-        ++i)
-    {
-        if (EqualSid(pAdminSid, &pTempAce->SidStart)) continue;
-
-        AddAce(
-            NewTokenDacl.DefaultDacl,
-            pTokenDacl->DefaultDacl->AclRevision,
-            0,
-            pTempAce,
-            pTempAce->Header.AceSize);
-    }
-
-    // 设置令牌DACL
-    Length += sizeof(TOKEN_DEFAULT_DACL);
-    result = SetTokenInformation(
-        hToken, TokenDefaultDacl, &NewTokenDacl, Length);
-    if (!result) goto FuncEnd;
-
-    // 开启LUA虚拟化
-    result = SetTokenInformation(
-        hToken,
-        TokenVirtualizationEnabled,
-        &EnableTokenVirtualization,
-        sizeof(BOOL));
-    if (!result) goto FuncEnd;
-
-FuncEnd: // 扫尾
-
-    if (result)
-    {
-        *TokenHandle = hToken.Detach();
-    }
-
-    return result;
-}
-
-HRESULT M2QueryWinLogonProcessId(
-    _Out_ PDWORD ProcessId,
-    _In_ DWORD SessionId)
-{
-    M2::CWTSMemory<PWTS_PROCESS_INFOW> pProcesses;
-    DWORD dwProcessCount = 0;
-
-    if (WTSEnumerateProcessesW(
-        WTS_CURRENT_SERVER_HANDLE,
-        0,
-        1,
-        &pProcesses,
-        &dwProcessCount))
-    {
-        for (DWORD i = 0; i < dwProcessCount; ++i)
-        {
-            PWTS_PROCESS_INFOW pProcess = &pProcesses[i];
-
-            if (pProcess->SessionId != SessionId)
-                continue;
-
-            if (!pProcess->pProcessName)
-                continue;
-
-            if (_wcsicmp(L"winlogon.exe", pProcess->pProcessName) != 0)
-                continue;
-
-            if (!pProcess->pUserSid)
-                continue;
-
-            if (!IsWellKnownSid(
-                pProcess->pUserSid, WELL_KNOWN_SID_TYPE::WinLocalSystemSid))
-                continue;
-
-            *ProcessId = pProcess->ProcessId;
-            return S_OK;
-        }
-    }
-
-    return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-}
-
-/*
-NSudoImpersonateAsSystem函数给当前线程分配一个SYSTEM用户模拟令牌。该函数还
-可以使当前线程停止使用模拟令牌。
-The NSudoImpersonateAsSystem function assigns an SYSTEM user impersonation
-token to the current thread. The function can also cause the current thread
-to stop using an impersonation token.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-BOOL WINAPI NSudoImpersonateAsSystem()
-{
-    BOOL result = FALSE;
-
-    DWORD dwSessionID = static_cast<DWORD>(-1);
-    DWORD dwWinLogonPID = static_cast<DWORD>(-1);
-
-    M2::CHandle OriginalToken;
-    M2::CHandle Token;
-
-    do
-    {
-        result = NSudoGetCurrentProcessSessionID(&dwSessionID);
-        if (!result) break;
-
-        if (FAILED(M2QueryWinLogonProcessId(&dwWinLogonPID, dwSessionID)))
-            break;
-
-        M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
-        TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::ProcessId;
-        TokenSource.ProcessId = dwWinLogonPID;
-        if (FAILED(M2OpenProcessToken(
-            &OriginalToken, &TokenSource, MAXIMUM_ALLOWED)))
-            break;
-
-        result = DuplicateTokenEx(
-            OriginalToken,
-            MAXIMUM_ALLOWED,
-            nullptr,
-            SecurityImpersonation,
-            TokenImpersonation,
-            &Token);
-        if (!result) break;
-
-        result = NSudoSetTokenAllPrivileges(Token, true);
-        if (result)
-        {
-            result = SetThreadToken(nullptr, Token);
-        }
-
-    } while (false);
-
-    return result;
-}
-
-#include <Userenv.h>
-#pragma comment(lib, "Userenv.lib")
-
-/*
-NSudoCreateProcess函数创建一个新进程和对应的主线程
-The NSudoCreateProcess function creates a new process and its primary thread.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-bool NSudoCreateProcess(
-    _In_opt_ HANDLE hToken,
-    _Inout_ LPCWSTR lpCommandLine,
-    _In_opt_ LPCWSTR lpCurrentDirectory,
-    _In_ DWORD WaitInterval,
-    _In_ DWORD ProcessPriority = 0,
-    _In_ DWORD ShowWindowMode = SW_SHOWDEFAULT,
-    _In_ bool CreateNewConsole = true)
-{
-    DWORD dwCreationFlags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
-
-    if (CreateNewConsole)
-    {
-        dwCreationFlags |= CREATE_NEW_CONSOLE;
-    }
-
-    STARTUPINFOW StartupInfo = { 0 };
-    PROCESS_INFORMATION ProcessInfo = { 0 };
-
-    StartupInfo.cb = sizeof(STARTUPINFOW);
-
-    StartupInfo.lpDesktop = const_cast<LPWSTR>(L"WinSta0\\Default");
-
-    StartupInfo.dwFlags |= STARTF_USESHOWWINDOW;
-    StartupInfo.wShowWindow = static_cast<WORD>(ShowWindowMode);
-
-    LPVOID lpEnvironment = nullptr;
-
-    BOOL result = FALSE;
-
-    M2::CHandle hCurrentToken;
-    M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
-    TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::Current;
-    if (SUCCEEDED(M2OpenProcessToken(
-        &hCurrentToken, &TokenSource, MAXIMUM_ALLOWED)))
-    {
-        if (CreateEnvironmentBlock(&lpEnvironment, hCurrentToken, TRUE))
-        {
-            std::wstring ExpandedString;
-
-            if (SUCCEEDED(M2ExpandEnvironmentStrings(
-                ExpandedString,
-                lpCommandLine)))
-            {
-                result = CreateProcessAsUserW(
-                    hToken,
-                    nullptr,
-                    const_cast<LPWSTR>(ExpandedString.c_str()),
-                    nullptr,
-                    nullptr,
-                    FALSE,
-                    dwCreationFlags,
-                    lpEnvironment,
-                    lpCurrentDirectory,
-                    &StartupInfo,
-                    &ProcessInfo);
-
-                if (result)
-                {
-                    SetPriorityClass(ProcessInfo.hProcess, ProcessPriority);
-
-                    ResumeThread(ProcessInfo.hThread);
-
-                    WaitForSingleObjectEx(
-                        ProcessInfo.hProcess, WaitInterval, FALSE);
-
-                    M2CloseHandle(ProcessInfo.hProcess);
-                    M2CloseHandle(ProcessInfo.hThread);
-                }
-            }
-
-            DestroyEnvironmentBlock(lpEnvironment);
-        }
-    }
-
-    //返回结果
-    return result;
-}
-
 #if _MSC_VER >= 1200
 #pragma warning(pop)
 #endif
 
-#include "ThirdParty/json.hpp"
+/*void x()
+{
+    JobObjectCreateSilo;
+    JobObjectExtendedLimitInformation;
+    JobObjectCpuRateControlInformation;
+    JobObjectReserved23Information; // JobObjectSiloSystemRoot
+    JobObjectReserved25Information; // JobObjectThreadImpersonationInformation
+    JobObjectReserved13Information; // JobObjectContainerId
+    JobObjectReserved15Information; // JobObjectSiloRootDirectory
+    JobObjectReserved16Information; // JobObjectServerSiloBasicInformation
+    JobObjectReserved17Information; // JobObjectServerSiloUserSharedData
+    JobObjectReserved18Information; // JobObjectServerSiloInitialize
+}*/
 
 // The NSudo message enum.
 enum NSUDO_MESSAGE
@@ -729,22 +147,22 @@ public:
     {
         StringTranslations.clear();
 
-        StringTranslations.insert(std::make_pair(
+        StringTranslations.emplace(std::make_pair(
             "NSudo.VersionText",
-            L"M2-Team NSudo " NSUDO_VERSION_STRING));
+            L"M2-Team NSudo " NSUDO_VERSION_STRING_FOR_SHOW));
 
-        StringTranslations.insert(std::make_pair(
+        StringTranslations.emplace(std::make_pair(
             "NSudo.LogoText",
-            L"M2-Team NSudo " NSUDO_VERSION_STRING L"\r\n"
+            L"M2-Team NSudo " NSUDO_VERSION_STRING_FOR_SHOW L"\r\n"
             L"© M2-Team. All rights reserved.\r\n"
             L"\r\n"));
 
-        StringTranslations.insert(std::make_pair(
+        StringTranslations.emplace(std::make_pair(
             "NSudo.String.Links",
             CNSudoTranslationAdapter::GetUTF8WithBOMStringResources(
                 IDR_String_Links)));
 
-        StringTranslations.insert(std::make_pair(
+        StringTranslations.emplace(std::make_pair(
             "NSudo.String.CommandLineHelp",
             CNSudoTranslationAdapter::GetUTF8WithBOMStringResources(
                 IDR_String_CommandLineHelp)));
@@ -756,6 +174,75 @@ public:
             L"String",
             MAKEINTRESOURCEW(IDR_String_Translations))))
         {
+            //const char* JsonString =
+            //    reinterpret_cast<const char*>(ResourceInfo.Pointer) + 3;
+            //size_t JsonStringLength = ResourceInfo.Size - 3;
+
+            //jsmn_parser JsonParser;
+            //::jsmn_init(&JsonParser);
+
+            //int JsonTokensCount = 0;
+            //unsigned int JsonTokensAllocatedCount = 256;
+
+            //jsmntok_t* JsonTokens = reinterpret_cast<jsmntok_t*>(::malloc(
+            //    sizeof(jsmntok_t) * JsonTokensAllocatedCount));
+            //if (JsonTokens)
+            //{
+            //    JsonTokensCount = ::jsmn_parse(
+            //        &JsonParser,
+            //        JsonString,
+            //        JsonStringLength,
+            //        JsonTokens,
+            //        JsonTokensAllocatedCount);
+            //    while (JsonTokensCount == JSMN_ERROR_NOMEM)
+            //    {
+            //        JsonTokensAllocatedCount += JsonTokensAllocatedCount >> 1;
+            //        JsonTokens = reinterpret_cast<jsmntok_t*>(::realloc(
+            //            JsonTokens,
+            //            sizeof(jsmntok_t) * JsonTokensAllocatedCount));
+            //        if (JsonTokens)
+            //        {
+            //            JsonTokensCount = ::jsmn_parse(
+            //                &JsonParser,
+            //                JsonString,
+            //                JsonStringLength,
+            //                JsonTokens,
+            //                JsonTokensAllocatedCount);
+            //        }
+            //    }
+            //}
+
+            ///* Assume the top-level element is an object */
+            //if (JsonTokensCount < 1 || JsonTokens[0].type != JSMN_OBJECT)
+            //{
+            //    return;
+            //}
+
+            //if ((JsonTokensCount - 1) % 2 != 0)
+            //{
+            //    return;
+            //}
+
+            //for (int i = 1; i < JsonTokensCount; i += 2)
+            //{
+            //    struct
+            //    {
+            //        jsmntype_t Type;
+            //        std::wstring Name;
+            //        int Size;
+
+            //    } CurrentToken;
+
+            //    StringTranslations.emplace(std::make_pair(
+            //        std::string(
+            //            JsonString + JsonTokens[i].start,
+            //            JsonTokens[i].end - JsonTokens[i].start),
+            //        M2MakeUTF16String(std::string(
+            //            JsonString + JsonTokens[i + 1].start,
+            //            JsonTokens[i + 1].end - JsonTokens[i + 1].start))));
+            //}
+
+
             nlohmann::json StringTranslationsJSON =
                 nlohmann::json::parse(std::string(
                     reinterpret_cast<const char*>(ResourceInfo.Pointer),
@@ -763,15 +250,13 @@ public:
 
             for (auto& Item : StringTranslationsJSON["Translations"].items())
             {
-                StringTranslations.insert(std::make_pair(
+                StringTranslations.emplace(std::make_pair(
                     Item.key(),
                     M2MakeUTF16String(Item.value())));
             }
         }
     }
 };
-
-#include <stdio.h>
 
 class CNSudoShortCutAdapter
 {
@@ -782,21 +267,42 @@ public:
     {
         ShortCutList.clear();
 
-        FILE* FileStream = nullptr;
-
-        if (_wfopen_s(&FileStream, ShortCutListPath.c_str(), L"r") == 0
-            && FileStream)
+        HANDLE FileHandle = ::CreateFileW(
+            ShortCutListPath.c_str(),
+            GENERIC_READ,
+            FILE_SHARE_READ,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_SEQUENTIAL_SCAN,
+            nullptr);
+        if (FileHandle != INVALID_HANDLE_VALUE)
         {
-            nlohmann::json ConfigJSON = nlohmann::json::parse(FileStream);
+            DWORD FileSize = ::GetFileSize(FileHandle, nullptr);
 
-            for (auto& Item : ConfigJSON["ShortCutList_V2"].items())
+            HANDLE FileMapping = CreateFileMappingW(
+                FileHandle, nullptr, PAGE_WRITECOPY, 0, 0, nullptr);
+            if (FileMapping)
             {
-                ShortCutList.insert(std::make_pair(
-                    M2MakeUTF16String(Item.key()),
-                    M2MakeUTF16String(Item.value())));
+                const char* MapAddress = reinterpret_cast<const char*>(
+                    MapViewOfFile(FileMapping, FILE_MAP_COPY, 0, 0, FileSize));
+                if (MapAddress)
+                {
+                    nlohmann::json ConfigJSON = nlohmann::json::parse(MapAddress);
+
+                    for (auto& Item : ConfigJSON["ShortCutList_V2"].items())
+                    {
+                        ShortCutList.emplace(std::make_pair(
+                            M2MakeUTF16String(Item.key()),
+                            M2MakeUTF16String(Item.value())));
+                    }
+
+                    ::UnmapViewOfFile(MapAddress);
+                }             
+
+                ::CloseHandle(FileMapping);
             }
 
-            fclose(FileStream);
+            ::CloseHandle(FileHandle);
         }
     }
 
@@ -831,9 +337,6 @@ private:
     std::map<std::string, std::wstring> m_StringTranslations;
     std::map<std::wstring, std::wstring> m_ShortCutList;
 
-    bool m_IsElevated = false;
-    HANDLE m_OriginalCurrentProcessToken = INVALID_HANDLE_VALUE;
-
 public:
     const HINSTANCE& Instance = this->m_Instance;
     const std::wstring& ExePath = this->m_ExePath;
@@ -842,9 +345,7 @@ public:
     const std::map<std::wstring, std::wstring>& ShortCutList =
         this->m_ShortCutList;
 
-    const HANDLE& OriginalCurrentProcessToken =
-        this->m_OriginalCurrentProcessToken;
-    const bool& IsElevated = this->m_IsElevated;
+    INSudoClient* pNSudoClient = nullptr;
 
 public:
     CNSudoResourceManagement() = default;
@@ -874,26 +375,12 @@ public:
             CNSudoShortCutAdapter::Read(
                 this->AppPath + L"\\NSudo.json", this->m_ShortCutList);
 
-            M2::CHandle CurrentProcessToken;
-
-            M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
-            TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::Current;
-            if (SUCCEEDED(M2OpenProcessToken(
-                &CurrentProcessToken, &TokenSource, MAXIMUM_ALLOWED)))
+            HRESULT hr = ::NSudoCreateInstance(
+                IID_INSudoClient,
+                reinterpret_cast<PVOID*>(&this->pNSudoClient));
+            if (FAILED(hr))
             {
-                if (DuplicateTokenEx(
-                    CurrentProcessToken,
-                    MAXIMUM_ALLOWED,
-                    nullptr,
-                    SecurityIdentification,
-                    TokenPrimary,
-                    &this->m_OriginalCurrentProcessToken))
-                {
-                    this->m_IsElevated = NSudoSetTokenPrivilege(
-                        CurrentProcessToken,
-                        SeDebugPrivilege,
-                        true);
-                }
+                ::ExitProcess(hr);
             }
 
             this->m_IsInitialized = true;
@@ -902,9 +389,9 @@ public:
 
     void UnInitialize()
     {
-        if (INVALID_HANDLE_VALUE != this->m_OriginalCurrentProcessToken)
+        if (this->pNSudoClient)
         {
-            M2CloseHandle(this->m_OriginalCurrentProcessToken);
+            this->pNSudoClient->Release();
         }
     }
 
@@ -923,230 +410,159 @@ public:
 
 CNSudoResourceManagement g_ResourceManagement;
 
-typedef struct _NSUDO_CONTEXT_MENU_ITEM
+/**
+ * Enables or disables privileges in the specified access token.
+ *
+ * @param TokenHandle A handle to the access token that contains the
+ *                    privileges to be modified. The handle must have
+ *                    TOKEN_ADJUST_PRIVILEGES access to the token.
+ * @param Privileges A key value map of privilege name and attributes.
+ *                   The attributes of a privilege can be a combination
+ *                   of the following values.
+ *                   SE_PRIVILEGE_ENABLED
+ *                       The function enables the privilege.
+ *                   SE_PRIVILEGE_REMOVED
+ *                       The privilege is removed from the list of
+ *                       privileges in the token.
+ *                   None
+ *                       The function disables the privilege.
+ * @return Standard Win32 Error. If the function succeeds, the return
+ *         value is ERROR_SUCCESS.
+ * @remark For more information, see AdjustTokenPrivileges.
+ */
+HRESULT NSudoAdjustTokenPrivileges(
+    HANDLE TokenHandle,
+    std::map<std::wstring, DWORD> const& Privileges)
 {
-    std::wstring ItemName;
-    std::wstring ItemDescription;
-    std::wstring ItemCommandParameters;
-    bool HasLUAShield = false;
-} NSUDO_CONTEXT_MENU_ITEM, *PNSUDO_CONTEXT_MENU_ITEM;
+    std::vector<LUID_AND_ATTRIBUTES> RawPrivileges;
 
-class CNSudoContextMenuAdapter
-{
-public:
-    static void Load(
-        std::vector<NSUDO_CONTEXT_MENU_ITEM>& ContextMenuItems)
+    for (auto const& Privilege : Privileges)
     {
-        M2_RESOURCE_INFO ResourceInfo = { 0 };
-        if (SUCCEEDED(M2LoadResource(
-            &ResourceInfo,
-            GetModuleHandleW(nullptr),
-            L"Config",
-            MAKEINTRESOURCEW(IDR_CONFIG_CONTEXT_MENU))))
+        LUID_AND_ATTRIBUTES RawPrivilege;
+
+        HRESULT hr = g_ResourceManagement.pNSudoClient->GetPrivilegeValue(
+            Privilege.first.c_str(), &RawPrivilege.Luid);
+        if (hr != S_OK)
         {
-            nlohmann::json ContextMenuJSON =
-                nlohmann::json::parse(std::string(
-                    reinterpret_cast<const char*>(ResourceInfo.Pointer),
-                    ResourceInfo.Size));
-
-            for (auto& Item : ContextMenuJSON["ContextMenu"])
-            {
-                std::string RawItemName =
-                    Item["ItemName"].get<std::string>();
-                std::string RawItemDescriptionID =
-                    Item["ItemDescriptionID"].get<std::string>();
-                std::string RawItemCommandParameters =
-                    Item["ItemCommandParameters"].get<std::string>();
-                bool HasLUAShield =
-                    Item["HasLUAShield"].get<bool>();
-
-                NSUDO_CONTEXT_MENU_ITEM ContextMenuItem;
-
-                ContextMenuItem.ItemName = M2MakeUTF16String(RawItemName);
-
-                ContextMenuItem.ItemDescription =
-                    g_ResourceManagement.GetTranslation(
-                        RawItemDescriptionID);
-
-                ContextMenuItem.ItemCommandParameters = M2MakeUTF16String(
-                    RawItemCommandParameters);
-
-                ContextMenuItem.HasLUAShield = HasLUAShield;
-
-                ContextMenuItems.push_back(ContextMenuItem);
-            }
-        }
-    }
-};
-
-class CNSudoContextMenuManagement
-{
-private:
-    DWORD m_ConstructorError = ERROR_SUCCESS;
-
-    std::wstring m_NSudoPath;
-    M2::CHKey m_CommandStoreRoot;
-
-    std::vector<NSUDO_CONTEXT_MENU_ITEM> m_ContextMenuItems;
-
-public:
-    CNSudoContextMenuManagement()
-    {
-        this->m_ConstructorError = M2GetWindowsDirectory(this->m_NSudoPath);
-        if (FAILED(this->m_ConstructorError))
-        {
-            return;
-        }
-        this->m_NSudoPath.append(L"\\NSudo.exe");
-
-        this->m_ConstructorError = RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE,
-            L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\CommandStore\\shell",
-            0,
-            KEY_ALL_ACCESS | KEY_WOW64_64KEY,
-            &this->m_CommandStoreRoot);
-        if (ERROR_SUCCESS != this->m_ConstructorError)
-            return;
-
-        CNSudoContextMenuAdapter::Load(this->m_ContextMenuItems);
-    }
-
-    HRESULT Install()
-    {
-        if (ERROR_SUCCESS != this->m_ConstructorError)
-            return this->m_ConstructorError;
-
-        CopyFileW(
-            M2GetCurrentProcessModulePath().c_str(),
-            this->m_NSudoPath.c_str(),
-            FALSE);
-
-        HRESULT hr = S_OK;
-
-        std::wstring NSudoPathWithQuotation =
-            std::wstring(L"\"") + this->m_NSudoPath + L"\"";
-
-        M2::CHKey hNSudoItem;
-        std::wstring SubCommands;
-
-        for (NSUDO_CONTEXT_MENU_ITEM Item : this->m_ContextMenuItems)
-        {
-            std::wstring GeneratedItemCommand =
-                NSudoPathWithQuotation + L" " +
-                Item.ItemCommandParameters + L" " +
-                L"-ShowWindowMode=Hide" + L" " +
-                L"cmd /c start \"NSudo.ContextMenu.Launcher\" " + L"\"%1\"";
-
-            hr = CreateCommandStoreItem(
-                this->m_CommandStoreRoot,
-                Item.ItemName.c_str(),
-                Item.ItemDescription.c_str(),
-                GeneratedItemCommand.c_str(),
-                Item.HasLUAShield);
-            if (FAILED(hr))
-                return hr;
-
-            SubCommands += Item.ItemName + L";";
-        }
-
-        hr = M2RegCreateKey(
-            HKEY_CLASSES_ROOT,
-            L"*\\shell\\NSudo",
-            KEY_ALL_ACCESS | KEY_WOW64_64KEY,
-            &hNSudoItem);
-        if (FAILED(hr))
             return hr;
-
-        struct
-        {
-            LPCWSTR lpValueName;
-            LPCWSTR lpValueData;
-        } ValueList[] =
-        {
-            {
-                L"SubCommands",
-                SubCommands.c_str()
-            },{
-                L"MUIVerb",
-                L"NSudo"
-            },{
-                L"Icon",
-                NSudoPathWithQuotation.c_str()
-            },{
-                L"Position",
-                L"1"
-            }
-        };
-
-        for (size_t i = 0; i < sizeof(ValueList) / sizeof(*ValueList); ++i)
-        {
-            hr = M2RegSetStringValue(
-                hNSudoItem,
-                ValueList[i].lpValueName,
-                ValueList[i].lpValueData);
-            if (FAILED(hr))
-                return hr;
-
         }
 
-        return hr;
+        RawPrivilege.Attributes = Privilege.second;
+
+        RawPrivileges.push_back(RawPrivilege);
     }
 
-    DWORD Uninstall()
+    return g_ResourceManagement.pNSudoClient->AdjustTokenPrivileges(
+        TokenHandle,
+        &RawPrivileges[0],
+        static_cast<DWORD>(RawPrivileges.size()));
+}
+
+/*
+NSudoCreateProcess函数创建一个新进程和对应的主线程
+The NSudoCreateProcess function creates a new process and its primary thread.
+
+如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
+If the function fails, the return value is NULL. To get extended error
+information, call GetLastError.
+*/
+bool NSudoCreateProcess(
+    _In_opt_ HANDLE hToken,
+    _Inout_ LPCWSTR lpCommandLine,
+    _In_opt_ LPCWSTR lpCurrentDirectory,
+    _In_ DWORD WaitInterval,
+    _In_ DWORD ProcessPriority = 0,
+    _In_ DWORD ShowWindowMode = SW_SHOWDEFAULT,
+    _In_ bool CreateNewConsole = true)
+{
+    DWORD dwCreationFlags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
+
+    if (CreateNewConsole)
     {
-        if (ERROR_SUCCESS != this->m_ConstructorError)
-            return this->m_ConstructorError;
-
-        // 首先尝试先去除只读，然后删除文件
-        HANDLE hFile = INVALID_HANDLE_VALUE;
-        HRESULT hr = M2CreateFile(
-            &hFile,
-            this->m_NSudoPath.c_str(),
-            SYNCHRONIZE | DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-            nullptr);
-        if (SUCCEEDED(hr))
-        {
-            hr = M2DeleteFileIgnoreReadonlyAttribute(hFile);
-            M2CloseHandle(hFile);
-        }
-
-        // 如果失败，则要求系统重启后删除
-        if (FAILED(hr))
-        {
-            MoveFileExW(
-                this->m_NSudoPath.c_str(),
-                nullptr,
-                MOVEFILE_DELAY_UNTIL_REBOOT);
-        }
-
-        DWORD dwError = ERROR_SUCCESS;
-
-        for (NSUDO_CONTEXT_MENU_ITEM Item : this->m_ContextMenuItems)
-        {
-            dwError = RegDeleteTreeW(
-                this->m_CommandStoreRoot,
-                Item.ItemName.c_str());
-            if (ERROR_SUCCESS != dwError)
-                break;
-        }
-
-        dwError = RegDeleteTreeW(
-            HKEY_CLASSES_ROOT,
-            L"*\\shell\\NSudo");
-
-        return dwError;
+        dwCreationFlags |= CREATE_NEW_CONSOLE;
     }
 
+    STARTUPINFOW StartupInfo = { 0 };
+    PROCESS_INFORMATION ProcessInfo = { 0 };
+
+    StartupInfo.cb = sizeof(STARTUPINFOW);
+
+    StartupInfo.lpDesktop = const_cast<LPWSTR>(L"WinSta0\\Default");
+
+    StartupInfo.dwFlags |= STARTF_USESHOWWINDOW;
+    StartupInfo.wShowWindow = static_cast<WORD>(ShowWindowMode);
+
+    LPVOID lpEnvironment = nullptr;
+
+    BOOL result = FALSE;
+
+    M2::CHandle hCurrentToken;
+    if (g_ResourceManagement.pNSudoClient->OpenCurrentProcessToken(
+        MAXIMUM_ALLOWED, &hCurrentToken) == S_OK)
+    {
+        if (CreateEnvironmentBlock(&lpEnvironment, hCurrentToken, TRUE))
+        {
+            std::wstring ExpandedString;
+
+            if (SUCCEEDED(M2ExpandEnvironmentStrings(
+                ExpandedString,
+                lpCommandLine)))
+            {
+                result = CreateProcessAsUserW(
+                    hToken,
+                    nullptr,
+                    const_cast<LPWSTR>(ExpandedString.c_str()),
+                    nullptr,
+                    nullptr,
+                    FALSE,
+                    dwCreationFlags,
+                    lpEnvironment,
+                    lpCurrentDirectory,
+                    &StartupInfo,
+                    &ProcessInfo);
+
+                if (result)
+                {
+                    SetPriorityClass(ProcessInfo.hProcess, ProcessPriority);
+
+                    ResumeThread(ProcessInfo.hThread);
+
+                    WaitForSingleObjectEx(
+                        ProcessInfo.hProcess, WaitInterval, FALSE);
+
+                    M2CloseHandle(ProcessInfo.hProcess);
+                    M2CloseHandle(ProcessInfo.hThread);
+                }
+            }
+
+            DestroyEnvironmentBlock(lpEnvironment);
+        }
+    }
+
+    //返回结果
+    return result;
+}
+
+class ThreadTokenContext
+{
+public:
+
+    HRESULT hr;
+
+    ThreadTokenContext(HANDLE TokenHandle) :
+        hr(g_ResourceManagement.pNSudoClient->SetCurrentThreadToken(TokenHandle))
+    {
+    }
+
+    ~ThreadTokenContext()
+    {
+        g_ResourceManagement.pNSudoClient->SetCurrentThreadToken(nullptr);
+    }
+  
 };
 
 // 解析命令行
 NSUDO_MESSAGE NSudoCommandLineParser(
-    _In_ bool bElevated,
-    _In_ bool bEnableContextMenuManagement,
     _In_ std::wstring& ApplicationName,
     _In_ std::map<std::wstring, std::wstring>& OptionsAndParameters,
     _In_ std::wstring& UnresolvedCommandLine)
@@ -1172,43 +588,98 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         }
         else
         {
-            if (bEnableContextMenuManagement)
-            {
-                CNSudoContextMenuManagement ContextMenuManagement;
-
-                if (0 == _wcsicmp(OptionAndParameter.first.c_str(), L"Install"))
-                {
-                    // 如果参数是 /Install 或 -Install，则安装NSudo到系统
-                    if (FAILED(ContextMenuManagement.Install()))
-                    {
-                        ContextMenuManagement.Uninstall();
-                    }
-
-                    return NSUDO_MESSAGE::SUCCESS;
-                }
-                else if (0 == _wcsicmp(OptionAndParameter.first.c_str(), L"Uninstall"))
-                {
-                    // 如果参数是 /Uninstall 或 -Uninstall，则移除安装到系统的NSudo
-                    ContextMenuManagement.Uninstall();
-
-                    return NSUDO_MESSAGE::SUCCESS;
-                }
-            }
-
             return NSUDO_MESSAGE::INVALID_COMMAND_PARAMETER;
         }
     }
 
-    DWORD dwSessionID = (DWORD)-1;
+    HRESULT hr = S_OK;
 
-    // 获取当前进程会话ID
-    if (!NSudoGetCurrentProcessSessionID(&dwSessionID))
+    M2::CHandle DuplicatedToken;
+    if (hr == S_OK)
+    {
+        M2::CHandle  CurrentProcessToken;
+        hr = g_ResourceManagement.pNSudoClient->OpenCurrentProcessToken(
+            MAXIMUM_ALLOWED, &CurrentProcessToken);
+        if (hr == S_OK)
+        {
+            hr = g_ResourceManagement.pNSudoClient->DuplicateToken(
+                CurrentProcessToken,
+                MAXIMUM_ALLOWED,
+                nullptr,
+                SecurityImpersonation,
+                TokenImpersonation,
+                &DuplicatedToken);
+            if (hr == S_OK)
+            {
+                std::map<std::wstring, DWORD> Privileges;
+
+                Privileges.insert(std::pair(
+                    SE_DEBUG_NAME, SE_PRIVILEGE_ENABLED));
+
+                hr = NSudoAdjustTokenPrivileges(
+                    DuplicatedToken, Privileges);
+            }
+        }
+    }
+
+    ThreadTokenContext CurrentThreadTokenContext(DuplicatedToken);
+
+    // 如果未获取 SeDebugPrivilege 权限，大概率不是管理员权限
+    if (!(hr == S_OK && CurrentThreadTokenContext.hr == S_OK))
+    {
+        return NSUDO_MESSAGE::PRIVILEGE_NOT_HELD;
+    }
+
+    DWORD dwSessionID = static_cast<DWORD>(-1);
+
+    M2::CHandle CurrentThreadToken;
+    hr = g_ResourceManagement.pNSudoClient->OpenCurrentThreadToken(
+        MAXIMUM_ALLOWED, FALSE, &CurrentThreadToken);
+    if (hr == S_OK)
+    {
+        DWORD ReturnLength = 0;
+        hr = g_ResourceManagement.pNSudoClient->GetTokenInformation(
+            CurrentThreadToken,
+            TokenSessionId,
+            &dwSessionID,
+            sizeof(DWORD),
+            &ReturnLength);
+    }
+
+    // 获取当前会话 ID 失败
+    if (hr != S_OK)
     {
         return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
     }
 
-    // 如果未提权或者模拟System权限失败
-    if (!(bElevated && NSudoImpersonateAsSystem()))
+    M2::CHandle SystemToken;
+
+    {
+        M2::CHandle OriginalToken;
+
+        hr = g_ResourceManagement.pNSudoClient->OpenLsassProcessToken(
+            MAXIMUM_ALLOWED, &OriginalToken);
+        if (hr == S_OK)
+        {
+            hr = g_ResourceManagement.pNSudoClient->DuplicateToken(
+                OriginalToken,
+                MAXIMUM_ALLOWED,
+                nullptr,
+                SecurityImpersonation,
+                TokenImpersonation,
+                &SystemToken);
+            if (hr == S_OK)
+            {
+                hr = g_ResourceManagement.pNSudoClient->AdjustTokenAllPrivileges(
+                    SystemToken, SE_PRIVILEGE_ENABLED);
+            }
+        }
+    }
+
+    ThreadTokenContext SystemTokenContext(SystemToken);
+
+    // 如果模拟System权限失败
+    if (!(hr == S_OK && SystemTokenContext.hr == S_OK))
     {
         return NSUDO_MESSAGE::PRIVILEGE_NOT_HELD;
     }
@@ -1216,7 +687,6 @@ NSUDO_MESSAGE NSudoCommandLineParser(
     bool bArgErr = false;
 
     M2::CHandle hToken;
-    M2::CHandle hTempToken;
 
     // 解析参数列表
 
@@ -1235,15 +705,6 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         Default,
         EnableAllPrivileges,
         DisableAllPrivileges
-    };
-
-    enum class NSudoOptionIntegrityLevelValue
-    {
-        Default,
-        System,
-        High,
-        Medium,
-        Low
     };
 
     enum class NSudoOptionProcessPriorityValue
@@ -1270,8 +731,6 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         NSudoOptionUserValue::Default;
     NSudoOptionPrivilegesValue PrivilegesMode =
         NSudoOptionPrivilegesValue::Default;
-    NSudoOptionIntegrityLevelValue IntegrityLevelMode =
-        NSudoOptionIntegrityLevelValue::Default;
     NSudoOptionProcessPriorityValue ProcessPriorityMode =
         NSudoOptionProcessPriorityValue::Default;
     NSudoOptionWindowModeValue WindowMode =
@@ -1281,6 +740,9 @@ NSUDO_MESSAGE NSudoCommandLineParser(
     std::wstring CurrentDirectory = g_ResourceManagement.AppPath;
     DWORD ShowWindowMode = SW_SHOWDEFAULT;
     bool CreateNewConsole = true;
+
+    NSUDO_MANDATORY_LABEL_TYPE MandatoryLabelType =
+        NSUDO_MANDATORY_LABEL_TYPE::UNTRUSTED;
 
     for (auto& OptionAndParameter : OptionsAndParameters)
     {
@@ -1332,19 +794,19 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         {
             if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"S"))
             {
-                IntegrityLevelMode = NSudoOptionIntegrityLevelValue::System;
+                MandatoryLabelType = NSUDO_MANDATORY_LABEL_TYPE::SYSTEM;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"H"))
             {
-                IntegrityLevelMode = NSudoOptionIntegrityLevelValue::High;
+                MandatoryLabelType = NSUDO_MANDATORY_LABEL_TYPE::HIGH;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"M"))
             {
-                IntegrityLevelMode = NSudoOptionIntegrityLevelValue::Medium;
+                MandatoryLabelType = NSUDO_MANDATORY_LABEL_TYPE::MEDIUM;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"L"))
             {
-                IntegrityLevelMode = NSudoOptionIntegrityLevelValue::Low;
+                MandatoryLabelType = NSUDO_MANDATORY_LABEL_TYPE::LOW;
             }
             else
             {
@@ -1436,78 +898,56 @@ NSUDO_MESSAGE NSudoCommandLineParser(
 
     if (NSudoOptionUserValue::TrustedInstaller == UserMode)
     {
-        SERVICE_STATUS_PROCESS ssStatus;
-
-        if (FAILED(M2StartService(L"TrustedInstaller", &ssStatus)))
-        {
-            return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
-        }
-
-        M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
-        TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::ProcessId;
-        TokenSource.ProcessId = ssStatus.dwProcessId;
-        if (FAILED(M2OpenProcessToken(&OriginalToken, &TokenSource, MAXIMUM_ALLOWED)))
+        if (S_OK != g_ResourceManagement.pNSudoClient->OpenServiceProcessToken(
+            L"TrustedInstaller", MAXIMUM_ALLOWED, &OriginalToken))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
     else if (NSudoOptionUserValue::System == UserMode)
     {
-        DWORD dwWinLogonPID = static_cast<DWORD>(-1);
-
-        if (FAILED(M2QueryWinLogonProcessId(&dwWinLogonPID, dwSessionID)))
-        {
-            return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
-        }
-
-        M2_PROCESS_ACCESS_TOKEN_SOURCE TokenSource;
-        TokenSource.Type = M2_PROCESS_TOKEN_SOURCE_TYPE::ProcessId;
-        TokenSource.ProcessId = dwWinLogonPID;
-        if (FAILED(M2OpenProcessToken(&OriginalToken, &TokenSource, MAXIMUM_ALLOWED)))
+        if (S_OK != g_ResourceManagement.pNSudoClient->OpenLsassProcessToken(
+            MAXIMUM_ALLOWED, &OriginalToken))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
     else if (NSudoOptionUserValue::CurrentUser == UserMode)
     {
-        if (!WTSQueryUserToken(dwSessionID, &OriginalToken))
+        if (S_OK != g_ResourceManagement.pNSudoClient->CreateSessionToken(
+            dwSessionID, &OriginalToken))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
     else if (NSudoOptionUserValue::CurrentProcess == UserMode)
     {
-        if (!DuplicateTokenEx(
-            g_ResourceManagement.OriginalCurrentProcessToken,
-            MAXIMUM_ALLOWED,
-            nullptr,
-            SecurityIdentification,
-            TokenPrimary,
-            &OriginalToken))
+        if (S_OK != g_ResourceManagement.pNSudoClient->OpenCurrentProcessToken(
+            MAXIMUM_ALLOWED, &OriginalToken))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
     else if (NSudoOptionUserValue::CurrentProcessDropRight == UserMode)
     {
-        if (!DuplicateTokenEx(
-            g_ResourceManagement.OriginalCurrentProcessToken,
-            MAXIMUM_ALLOWED,
-            nullptr,
-            SecurityIdentification,
-            TokenPrimary,
-            &hTempToken))
+        HANDLE CurrentProcessToken = nullptr;
+        hr = g_ResourceManagement.pNSudoClient->OpenCurrentProcessToken(
+            MAXIMUM_ALLOWED, &CurrentProcessToken);
+        if (hr == S_OK)
         {
-            return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
+            hr = g_ResourceManagement.pNSudoClient->CreateLUAToken(
+                CurrentProcessToken, &OriginalToken);
+
+            ::CloseHandle(CurrentProcessToken);
         }
 
-        if (!NSudoCreateLUAToken(&OriginalToken, hTempToken))
+        if (S_OK != hr)
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
 
-    if (!DuplicateTokenEx(
+    if (S_OK != g_ResourceManagement.pNSudoClient->DuplicateToken(
         OriginalToken,
         MAXIMUM_ALLOWED,
         nullptr,
@@ -1518,7 +958,7 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
     }
 
-    if (!SetTokenInformation(
+    if (S_OK != g_ResourceManagement.pNSudoClient->SetTokenInformation(
         hToken,
         TokenSessionId,
         (PVOID)&dwSessionID,
@@ -1529,43 +969,25 @@ NSUDO_MESSAGE NSudoCommandLineParser(
 
     if (NSudoOptionPrivilegesValue::EnableAllPrivileges == PrivilegesMode)
     {
-        if (!NSudoSetTokenAllPrivileges(hToken, true))
+        if (S_OK != g_ResourceManagement.pNSudoClient->AdjustTokenAllPrivileges(
+            hToken, SE_PRIVILEGE_ENABLED))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
     else if (NSudoOptionPrivilegesValue::DisableAllPrivileges == PrivilegesMode)
     {
-        if (!NSudoSetTokenAllPrivileges(hToken, false))
+        if (S_OK != g_ResourceManagement.pNSudoClient->AdjustTokenAllPrivileges(
+            hToken, 0))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
     }
 
-    if (NSudoOptionIntegrityLevelValue::System == IntegrityLevelMode)
+    if (MandatoryLabelType != NSUDO_MANDATORY_LABEL_TYPE::UNTRUSTED)
     {
-        if (!NSudoSetTokenIntegrityLevel(hToken, SystemLevel))
-        {
-            return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
-        }
-    }
-    else if (NSudoOptionIntegrityLevelValue::High == IntegrityLevelMode)
-    {
-        if (!NSudoSetTokenIntegrityLevel(hToken, HighLevel))
-        {
-            return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
-        }
-    }
-    else if (NSudoOptionIntegrityLevelValue::Medium == IntegrityLevelMode)
-    {
-        if (!NSudoSetTokenIntegrityLevel(hToken, MediumLevel))
-        {
-            return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
-        }
-    }
-    else if (NSudoOptionIntegrityLevelValue::Low == IntegrityLevelMode)
-    {
-        if (!NSudoSetTokenIntegrityLevel(hToken, LowLevel))
+        if (S_OK != g_ResourceManagement.pNSudoClient->SetTokenMandatoryLabel(
+            hToken, MandatoryLabelType))
         {
             return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
         }
@@ -1631,8 +1053,6 @@ NSUDO_MESSAGE NSudoCommandLineParser(
     {
         return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
     }
-
-    RevertToSelf();
 
     return NSUDO_MESSAGE::SUCCESS;
 }
@@ -1701,9 +1121,6 @@ HRESULT NSudoShowAboutDialog(
 }
 
 #if defined(NSUDO_GUI_WINDOWS)
-
-#include <atlbase.h>
-#include <atlwin.h>
 
 class CNSudoMainWindow : public ATL::CDialogImpl<CNSudoMainWindow>
 {
@@ -1912,8 +1329,8 @@ private:
             LogicalRect.top, USER_DEFAULT_SCREEN_DPI, this->m_yDPI);
         LogicalRect.right = MulDiv(
             LogicalRect.right, USER_DEFAULT_SCREEN_DPI, this->m_xDPI);
-        LogicalRect.bottom = MulDiv
-        (LogicalRect.bottom, USER_DEFAULT_SCREEN_DPI, this->m_yDPI);
+        LogicalRect.bottom = MulDiv(
+            LogicalRect.bottom, USER_DEFAULT_SCREEN_DPI, this->m_yDPI);
 
         return result;
     }
@@ -2069,8 +1486,6 @@ private:
                     UnresolvedCommandLine);
 
             NSUDO_MESSAGE message = NSudoCommandLineParser(
-                true,
-                true,
                 ApplicationName,
                 OptionsAndParameters,
                 UnresolvedCommandLine);
@@ -2211,21 +1626,10 @@ int NSudoMain()
         return 0;
     }
 
-#if defined(NSUDO_CUI_CONSOLE)
     NSUDO_MESSAGE message = NSudoCommandLineParser(
-        g_ResourceManagement.IsElevated,
-        false,
         ApplicationName,
         OptionsAndParameters,
         UnresolvedCommandLine);
-#elif defined(NSUDO_GUI_WINDOWS)
-    NSUDO_MESSAGE message = NSudoCommandLineParser(
-        g_ResourceManagement.IsElevated,
-        true,
-        ApplicationName,
-        OptionsAndParameters,
-        UnresolvedCommandLine);
-#endif
 
     if (NSUDO_MESSAGE::NEED_TO_SHOW_COMMAND_LINE_HELP == message)
     {
