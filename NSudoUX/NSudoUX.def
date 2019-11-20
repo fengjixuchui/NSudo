@@ -2,4 +2,7 @@
 
 EXPORTS
 
+NSudoUXGetTranslation
+NSudoUXGetMessageString
 
+NSudoUXLoadShortCut

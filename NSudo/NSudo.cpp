@@ -38,8 +38,6 @@
 #include <string_view>
 #include <vector>
 
-#include "json.hpp"
-
 //#include "jsmn.h"
 
 #if defined(NSUDO_GUI_WINDOWS)
@@ -49,6 +47,8 @@
 
 #include "NSudoVersion.h"
 #include "Resources/resource.h"
+
+#include <NSudoUX.h>
 
 // 为编译通过而禁用的警告
 #if _MSC_VER >= 1200
@@ -96,227 +96,18 @@ std::wstring GetMessageByID(DWORD MessageID)
     JobObjectReserved18Information; // JobObjectServerSiloInitialize
 }*/
 
-// The NSudo message enum.
-enum NSUDO_MESSAGE
-{
-    SUCCESS,
-    PRIVILEGE_NOT_HELD,
-    INVALID_COMMAND_PARAMETER,
-    INVALID_TEXTBOX_PARAMETER,
-    CREATE_PROCESS_FAILED,
-    NEED_TO_SHOW_COMMAND_LINE_HELP,
-    NEED_TO_SHOW_NSUDO_VERSION
-};
 
-const char* NSudoMessageTranslationID[] =
-{
-    "Message.Success",
-    "Message.PrivilegeNotHeld",
-    "Message.InvalidCommandParameter",
-    "Message.InvalidTextBoxParameter",
-    "Message.CreateProcessFailed",
-    "",
-    ""
-};
-
-class CNSudoTranslationAdapter
-{
-private:
-    static std::wstring GetUTF8WithBOMStringResources(
-        _In_ UINT uID)
-    {
-        M2_RESOURCE_INFO ResourceInfo = { 0 };
-        if (SUCCEEDED(M2LoadResource(
-            &ResourceInfo,
-            GetModuleHandleW(nullptr),
-            L"String",
-            MAKEINTRESOURCEW(uID))))
-        {
-            // Raw string without the UTF-8 BOM. (0xEF,0xBB,0xBF)	
-            return M2MakeUTF16String(std::string(
-                reinterpret_cast<const char*>(ResourceInfo.Pointer) + 3,
-                ResourceInfo.Size - 3));
-        }
-
-        return L"";
-    }
-
-public:
-    static void Load(
-        std::map<std::string, std::wstring>& StringTranslations)
-    {
-        StringTranslations.clear();
-
-        StringTranslations.emplace(std::make_pair(
-            "NSudo.VersionText",
-            L"M2-Team NSudo " NSUDO_VERSION_STRING_FOR_SHOW));
-
-        StringTranslations.emplace(std::make_pair(
-            "NSudo.LogoText",
-            L"M2-Team NSudo " NSUDO_VERSION_STRING_FOR_SHOW L"\r\n"
-            L"© M2-Team. All rights reserved.\r\n"
-            L"\r\n"));
-
-        StringTranslations.emplace(std::make_pair(
-            "NSudo.String.Links",
-            CNSudoTranslationAdapter::GetUTF8WithBOMStringResources(
-                IDR_String_Links)));
-
-        StringTranslations.emplace(std::make_pair(
-            "NSudo.String.CommandLineHelp",
-            CNSudoTranslationAdapter::GetUTF8WithBOMStringResources(
-                IDR_String_CommandLineHelp)));
-
-        M2_RESOURCE_INFO ResourceInfo = { 0 };
-        if (SUCCEEDED(M2LoadResource(
-            &ResourceInfo,
-            GetModuleHandleW(nullptr),
-            L"String",
-            MAKEINTRESOURCEW(IDR_String_Translations))))
-        {
-            //const char* JsonString =
-            //    reinterpret_cast<const char*>(ResourceInfo.Pointer) + 3;
-            //size_t JsonStringLength = ResourceInfo.Size - 3;
-
-            //jsmn_parser JsonParser;
-            //::jsmn_init(&JsonParser);
-
-            //int JsonTokensCount = 0;
-            //unsigned int JsonTokensAllocatedCount = 256;
-
-            //jsmntok_t* JsonTokens = reinterpret_cast<jsmntok_t*>(::malloc(
-            //    sizeof(jsmntok_t) * JsonTokensAllocatedCount));
-            //if (JsonTokens)
-            //{
-            //    JsonTokensCount = ::jsmn_parse(
-            //        &JsonParser,
-            //        JsonString,
-            //        JsonStringLength,
-            //        JsonTokens,
-            //        JsonTokensAllocatedCount);
-            //    while (JsonTokensCount == JSMN_ERROR_NOMEM)
-            //    {
-            //        JsonTokensAllocatedCount += JsonTokensAllocatedCount >> 1;
-            //        JsonTokens = reinterpret_cast<jsmntok_t*>(::realloc(
-            //            JsonTokens,
-            //            sizeof(jsmntok_t) * JsonTokensAllocatedCount));
-            //        if (JsonTokens)
-            //        {
-            //            JsonTokensCount = ::jsmn_parse(
-            //                &JsonParser,
-            //                JsonString,
-            //                JsonStringLength,
-            //                JsonTokens,
-            //                JsonTokensAllocatedCount);
-            //        }
-            //    }
-            //}
-
-            ///* Assume the top-level element is an object */
-            //if (JsonTokensCount < 1 || JsonTokens[0].type != JSMN_OBJECT)
-            //{
-            //    return;
-            //}
-
-            //if ((JsonTokensCount - 1) % 2 != 0)
-            //{
-            //    return;
-            //}
-
-            //for (int i = 1; i < JsonTokensCount; i += 2)
-            //{
-            //    struct
-            //    {
-            //        jsmntype_t Type;
-            //        std::wstring Name;
-            //        int Size;
-
-            //    } CurrentToken;
-
-            //    StringTranslations.emplace(std::make_pair(
-            //        std::string(
-            //            JsonString + JsonTokens[i].start,
-            //            JsonTokens[i].end - JsonTokens[i].start),
-            //        M2MakeUTF16String(std::string(
-            //            JsonString + JsonTokens[i + 1].start,
-            //            JsonTokens[i + 1].end - JsonTokens[i + 1].start))));
-            //}
-
-
-            nlohmann::json StringTranslationsJSON =
-                nlohmann::json::parse(std::string(
-                    reinterpret_cast<const char*>(ResourceInfo.Pointer),
-                    ResourceInfo.Size));
-
-            for (auto& Item : StringTranslationsJSON["Translations"].items())
-            {
-                StringTranslations.emplace(std::make_pair(
-                    Item.key(),
-                    M2MakeUTF16String(Item.value())));
-            }
-        }
-    }
-};
 
 class CNSudoShortCutAdapter
 {
 public:
-    static void Read(
-        const std::wstring& ShortCutListPath,
-        std::map<std::wstring, std::wstring>& ShortCutList)
-    {
-        ShortCutList.clear();
 
-        HANDLE FileHandle = ::CreateFileW(
-            ShortCutListPath.c_str(),
-            GENERIC_READ,
-            FILE_SHARE_READ,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_FLAG_SEQUENTIAL_SCAN,
-            nullptr);
-        if (FileHandle != INVALID_HANDLE_VALUE)
-        {
-            DWORD FileSize = ::GetFileSize(FileHandle, nullptr);
 
-            HANDLE FileMapping = CreateFileMappingW(
-                FileHandle, nullptr, PAGE_WRITECOPY, 0, 0, nullptr);
-            if (FileMapping)
-            {
-                const char* MapAddress = reinterpret_cast<const char*>(
-                    MapViewOfFile(FileMapping, FILE_MAP_COPY, 0, 0, FileSize));
-                if (MapAddress)
-                {
-                    nlohmann::json ConfigJSON = nlohmann::json::parse(MapAddress);
 
-                    for (auto& Item : ConfigJSON["ShortCutList_V2"].items())
-                    {
-                        ShortCutList.emplace(std::make_pair(
-                            M2MakeUTF16String(Item.key()),
-                            M2MakeUTF16String(Item.value())));
-                    }
-
-                    ::UnmapViewOfFile(MapAddress);
-                }             
-
-                ::CloseHandle(FileMapping);
-            }
-
-            ::CloseHandle(FileHandle);
-        }
-    }
-
-    static void Write(
-        const std::wstring& ShortCutListPath,
-        const std::map<std::wstring, std::wstring>& ShortCutList)
-    {
-        ShortCutListPath;
-        ShortCutList;
-    }
 
     static std::wstring Translate(
-        const std::map<std::wstring, std::wstring>& ShortCutList,
-        const std::wstring& CommandLine)
+        std::map<std::wstring, BSTR> const& ShortCutList,
+        std::wstring const& CommandLine)
     {
         auto iterator = ShortCutList.find(CommandLine);
 
@@ -334,17 +125,17 @@ private:
     std::wstring m_ExePath;
     std::wstring m_AppPath;
 
-    std::map<std::string, std::wstring> m_StringTranslations;
-    std::map<std::wstring, std::wstring> m_ShortCutList;
+    std::map<std::wstring, BSTR> m_ShortCutList;
 
 public:
     const HINSTANCE& Instance = this->m_Instance;
     const std::wstring& ExePath = this->m_ExePath;
     const std::wstring& AppPath = this->m_AppPath;
 
-    const std::map<std::wstring, std::wstring>& ShortCutList =
+    const std::map<std::wstring, BSTR>& ShortCutList =
         this->m_ShortCutList;
 
+    INSudoMemoryManager* pNSudoMemoryManager = nullptr;
     INSudoClient* pNSudoClient = nullptr;
 
 public:
@@ -370,15 +161,23 @@ public:
             wcsrchr(&this->m_AppPath[0], L'\\')[0] = L'\0';
             this->m_AppPath.resize(wcslen(this->m_AppPath.c_str()));
 
-            CNSudoTranslationAdapter::Load(this->m_StringTranslations);
+            NSudoUXLoadShortCut(
+                (this->AppPath + L"\\NSudo.json").c_str(), this->m_ShortCutList);
 
-            CNSudoShortCutAdapter::Read(
-                this->AppPath + L"\\NSudo.json", this->m_ShortCutList);
+            HRESULT hr = S_OK;
 
-            HRESULT hr = ::NSudoCreateInstance(
+            hr = ::NSudoCreateInstance(
+                IID_INSudoMemoryManager,
+                reinterpret_cast<PVOID*>(&this->pNSudoMemoryManager));
+            if (S_OK != hr)
+            {
+                ::ExitProcess(hr);
+            }
+
+            hr = ::NSudoCreateInstance(
                 IID_INSudoClient,
                 reinterpret_cast<PVOID*>(&this->pNSudoClient));
-            if (FAILED(hr))
+            if (S_OK != hr)
             {
                 ::ExitProcess(hr);
             }
@@ -393,18 +192,6 @@ public:
         {
             this->pNSudoClient->Release();
         }
-    }
-
-    std::wstring GetTranslation(
-        _In_ std::string Key)
-    {
-        return this->m_StringTranslations[Key];
-    }
-
-    std::wstring GetMessageString(
-        _In_ NSUDO_MESSAGE MessageID)
-    {
-        return this->GetTranslation(NSudoMessageTranslationID[MessageID]);
     }
 };
 
@@ -1063,9 +850,9 @@ void NSudoPrintMsg(
     _In_ LPCWSTR lpContent)
 {
     std::wstring DialogContent =
-        g_ResourceManagement.GetTranslation("NSudo.LogoText") +
+        std::wstring(NSudoUXGetTranslation("NSudo.LogoText")) +
         lpContent +
-        g_ResourceManagement.GetTranslation("NSudo.String.Links");
+        NSudoUXGetTranslation("NSudo.String.Links");
 
 #if defined(NSUDO_CUI_CONSOLE)
     UNREFERENCED_PARAMETER(hInstance);
@@ -1092,9 +879,9 @@ HRESULT NSudoShowAboutDialog(
     _In_ HWND hwndParent)
 {
     std::wstring DialogContent =
-        g_ResourceManagement.GetTranslation("NSudo.LogoText") +
-        g_ResourceManagement.GetTranslation("NSudo.String.CommandLineHelp") +
-        g_ResourceManagement.GetTranslation("NSudo.String.Links");
+        std::wstring(NSudoUXGetTranslation("NSudo.LogoText")) +
+        NSudoUXGetTranslation("NSudo.String.CommandLineHelp") +
+        NSudoUXGetTranslation("NSudo.String.Links");
 
     SetLastError(ERROR_SUCCESS);
 
@@ -1197,7 +984,7 @@ private:
         this->m_hszPath = this->GetDlgItem(IDC_szPath);
 
         this->SetWindowTextW(
-            g_ResourceManagement.GetTranslation("NSudo.VersionText").c_str());
+            NSudoUXGetTranslation("NSudo.VersionText"));
 
         struct { const char* ID; ATL::CWindow Control; } x[] =
         {
@@ -1213,7 +1000,7 @@ private:
 
         for (size_t i = 0; i < sizeof(x) / sizeof(x[0]); ++i)
         {
-            std::wstring Buffer = g_ResourceManagement.GetTranslation(x[i].ID);
+            std::wstring Buffer = NSudoUXGetTranslation(x[i].ID);
             x[i].Control.SetWindowTextW(Buffer.c_str());
         }
 
@@ -1250,7 +1037,7 @@ private:
         const char* UserNameID[] = { "TI" ,"System" ,"CurrentProcess" ,"CurrentUser" };
         for (size_t i = 0; i < sizeof(UserNameID) / sizeof(*UserNameID); ++i)
         {
-            std::wstring Buffer = g_ResourceManagement.GetTranslation(UserNameID[i]);
+            std::wstring Buffer = NSudoUXGetTranslation(UserNameID[i]);
             SendMessageW(this->m_hUserName, CB_INSERTSTRING, 0, (LPARAM)Buffer.c_str());
         }
 
@@ -1421,7 +1208,7 @@ private:
 
         if (_wcsicmp(L"", RawCommandLine.c_str()) == 0)
         {
-            std::wstring Buffer = g_ResourceManagement.GetMessageString(
+            std::wstring Buffer = NSudoUXGetMessageString(
                 NSUDO_MESSAGE::INVALID_TEXTBOX_PARAMETER);
             NSudoPrintMsg(
                 g_ResourceManagement.Instance,
@@ -1434,25 +1221,25 @@ private:
 
             // 获取用户令牌
             if (0 == _wcsicmp(
-                g_ResourceManagement.GetTranslation("TI").c_str(),
+                NSudoUXGetTranslation("TI"),
                 UserName.c_str()))
             {
                 CommandLine += L" -U:T";
             }
             else if (0 == _wcsicmp(
-                g_ResourceManagement.GetTranslation("System").c_str(),
+                NSudoUXGetTranslation("System"),
                 UserName.c_str()))
             {
                 CommandLine += L" -U:S";
             }
             else if (0 == _wcsicmp(
-                g_ResourceManagement.GetTranslation("CurrentProcess").c_str(),
+                NSudoUXGetTranslation("CurrentProcess"),
                 UserName.c_str()))
             {
                 CommandLine += L" -U:P";
             }
             else if (0 == _wcsicmp(
-                g_ResourceManagement.GetTranslation("CurrentUser").c_str(),
+                NSudoUXGetTranslation("CurrentUser"),
                 UserName.c_str()))
             {
                 CommandLine += L" -U:C";
@@ -1480,7 +1267,7 @@ private:
                 UnresolvedCommandLine);
 
             UnresolvedCommandLine =
-                L"cmd /c start \"NSudo.Launcher\" " +
+                std::wstring(L"cmd /c start \"NSudo.Launcher\" ") +
                 CNSudoShortCutAdapter::Translate(
                     g_ResourceManagement.ShortCutList,
                     UnresolvedCommandLine);
@@ -1491,7 +1278,7 @@ private:
                 UnresolvedCommandLine);
             if (NSUDO_MESSAGE::SUCCESS != message)
             {
-                std::wstring Buffer = g_ResourceManagement.GetMessageString(
+                std::wstring Buffer = NSudoUXGetMessageString(
                     message);
                 NSudoPrintMsg(
                     g_ResourceManagement.Instance,
@@ -1613,7 +1400,7 @@ int NSudoMain()
 
     UnresolvedCommandLine = CNSudoShortCutAdapter::Translate(
         g_ResourceManagement.ShortCutList,
-        UnresolvedCommandLine);
+        UnresolvedCommandLine.c_str());
 
     if (OptionsAndParameters.empty() && UnresolvedCommandLine.empty())
     {
@@ -1640,11 +1427,11 @@ int NSudoMain()
         NSudoPrintMsg(
             g_ResourceManagement.Instance,
             nullptr,
-            g_ResourceManagement.GetTranslation("NSudo.VersionText").c_str());
+            NSudoUXGetTranslation("NSudo.VersionText"));
     }
     else if (NSUDO_MESSAGE::SUCCESS != message)
     {
-        std::wstring Buffer = g_ResourceManagement.GetMessageString(
+        std::wstring Buffer = NSudoUXGetMessageString(
             message);
         NSudoPrintMsg(
             g_ResourceManagement.Instance,
