@@ -4,6 +4,12 @@
 
 - Update links information in NSudo binaries.
 - Convert C API to COM interface in NSudo Shared Library.
+- Add .Net interoperability support.
+- Add NSudo User Experience Library.
+- Optimize the icon resource size.
+- Use jsmn instead of JSON for Modern C++.
+- Add NSudoLib for static linking.
+- Make NSudoG.exe and NSudoC.exe single file style again.
 
 **NSudo 8.0.0-alpha1**
 

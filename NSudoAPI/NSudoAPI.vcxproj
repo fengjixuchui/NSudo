@@ -57,8 +57,9 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-	<Import Condition="'$(Configuration)'=='Release'" Project="..\MSBuild\VC-LTL.props" />
-  </ImportGroup> 
+    <Import Condition="'$(Configuration)'=='Release'" Project="..\MSBuild\VC-LTL.props" />
+    <Import Project="..\MSBuild\NSudoLib.props" />
+  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <OutDir>$(SolutionDir)Output\$(Configuration)\$(Platform)\</OutDir>
@@ -75,6 +76,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+	  <AdditionalOptions>/d2FH4- %(AdditionalOptions)</AdditionalOptions>
       <EnableEnhancedInstructionSet Condition="'$(Platform)'=='Win32'">NoExtensions</EnableEnhancedInstructionSet>
       <PreprocessorDefinitions>NSUDOAPI_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Platform)'=='Win32'">WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -98,12 +100,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DllMain.cpp" />
-    <ClCompile Include="M2.Base.cpp" />
-    <ClCompile Include="NSudoAPI.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="M2.Base.h" />
-    <ClInclude Include="NSudoAPI.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="NSudoAPI.def" />
