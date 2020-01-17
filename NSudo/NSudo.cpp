@@ -171,15 +171,34 @@ bool JsmnParseJson(
     return Tokens;
 }
 
+typedef struct _JSON_TOKEN_INFO
+{
+    jsmntype_t Type;
+    const char* Name;
+    std::size_t NameLength;
+    int Size;
+} JSON_TOKEN_INFO, *PJSON_TOKEN_INFO;
+
+void JsmnGetTokenInfo(
+    _Out_ PJSON_TOKEN_INFO JsonTokenInfo,
+    _In_ const char* JsonString,
+    _In_ jsmntok_t* JsonToken)
+{
+    JsonTokenInfo->Type = JsonToken->type;
+    JsonTokenInfo->Name = JsonString + JsonToken->start;
+    JsonTokenInfo->NameLength = JsonToken->end - JsonToken->start;
+    JsonTokenInfo->Size = JsonToken->size;
+}
+
 bool JsmnJsonEqual(
     _In_ const char* JsonString,
-    _In_ jsmntok_t* JsonTokens,
+    _In_ jsmntok_t* JsonToken,
     _In_ const char* String)
 {
-    if (JsonTokens->type == JSMN_STRING)
+    if (JsonToken->type == JSMN_STRING)
     {
-        const char* CurrentToken = JsonString + JsonTokens->start;
-        std::size_t CurrentTokenLength = JsonTokens->end - JsonTokens->start;
+        const char* CurrentToken = JsonString + JsonToken->start;
+        std::size_t CurrentTokenLength = JsonToken->end - JsonToken->start;
         if (::strlen(String) == CurrentTokenLength)
         {
             if (::strncmp(CurrentToken, String, CurrentTokenLength) == 0)
@@ -597,91 +616,6 @@ HRESULT NSudoAdjustTokenPrivileges(
         static_cast<DWORD>(RawPrivileges.size()));
 }
 
-/*
-NSudoCreateProcess函数创建一个新进程和对应的主线程
-The NSudoCreateProcess function creates a new process and its primary thread.
-
-如果函数执行失败，返回值为NULL。调用GetLastError可获取详细错误码。
-If the function fails, the return value is NULL. To get extended error
-information, call GetLastError.
-*/
-bool NSudoCreateProcess(
-    _In_opt_ HANDLE hToken,
-    _Inout_ LPCWSTR lpCommandLine,
-    _In_opt_ LPCWSTR lpCurrentDirectory,
-    _In_ DWORD WaitInterval,
-    _In_ DWORD ProcessPriority = 0,
-    _In_ DWORD ShowWindowMode = SW_SHOWDEFAULT,
-    _In_ bool CreateNewConsole = true)
-{
-    DWORD dwCreationFlags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
-
-    if (CreateNewConsole)
-    {
-        dwCreationFlags |= CREATE_NEW_CONSOLE;
-    }
-
-    STARTUPINFOW StartupInfo = { 0 };
-    PROCESS_INFORMATION ProcessInfo = { 0 };
-
-    StartupInfo.cb = sizeof(STARTUPINFOW);
-
-    StartupInfo.lpDesktop = const_cast<LPWSTR>(L"WinSta0\\Default");
-
-    StartupInfo.dwFlags |= STARTF_USESHOWWINDOW;
-    StartupInfo.wShowWindow = static_cast<WORD>(ShowWindowMode);
-
-    LPVOID lpEnvironment = nullptr;
-
-    BOOL result = FALSE;
-
-    M2::CHandle hCurrentToken;
-    if (g_ResourceManagement.pNSudoClient->OpenCurrentProcessToken(
-        MAXIMUM_ALLOWED, &hCurrentToken) == S_OK)
-    {
-        if (CreateEnvironmentBlock(&lpEnvironment, hCurrentToken, TRUE))
-        {
-            std::wstring ExpandedString;
-
-            if (SUCCEEDED(M2ExpandEnvironmentStrings(
-                ExpandedString,
-                lpCommandLine)))
-            {
-                result = CreateProcessAsUserW(
-                    hToken,
-                    nullptr,
-                    const_cast<LPWSTR>(ExpandedString.c_str()),
-                    nullptr,
-                    nullptr,
-                    FALSE,
-                    dwCreationFlags,
-                    lpEnvironment,
-                    lpCurrentDirectory,
-                    &StartupInfo,
-                    &ProcessInfo);
-
-                if (result)
-                {
-                    SetPriorityClass(ProcessInfo.hProcess, ProcessPriority);
-
-                    ResumeThread(ProcessInfo.hThread);
-
-                    WaitForSingleObjectEx(
-                        ProcessInfo.hProcess, WaitInterval, FALSE);
-
-                    M2CloseHandle(ProcessInfo.hProcess);
-                    M2CloseHandle(ProcessInfo.hThread);
-                }
-            }
-
-            DestroyEnvironmentBlock(lpEnvironment);
-        }
-    }
-
-    //返回结果
-    return result;
-}
-
 class ThreadTokenContext
 {
 public:
@@ -823,6 +757,84 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         return NSUDO_MESSAGE::PRIVILEGE_NOT_HELD;
     }
 
+
+
+
+
+    //HANDLE UserToken = INVALID_HANDLE_VALUE;
+    //if (::LogonUserExW(
+    //    L"YoloUser",
+    //    L".",
+    //    L"123456",
+    //    LOGON32_LOGON_INTERACTIVE,
+    //    LOGON32_PROVIDER_DEFAULT,
+    //    &UserToken,
+    //    nullptr,
+    //    nullptr,
+    //    nullptr,
+    //    nullptr))
+    //{
+    //    //BOOL re = ImpersonateLoggedOnUser(UserToken);
+    //    //re = re;
+
+    //    DWORD ReturnLength = 0;
+    //    TOKEN_LINKED_TOKEN LinkedToken = { 0 };
+    //    hr = g_ResourceManagement.pNSudoClient->GetTokenInformation(UserToken, TokenLinkedToken, &LinkedToken, sizeof(LinkedToken), &ReturnLength);
+
+    //    
+
+    //    PROFILEINFOW ProfileInfo = { 0 };
+    //    ProfileInfo.dwSize = sizeof(PROFILEINFOW);
+    //    ProfileInfo.lpUserName = L"YoloUser";
+
+    //    if (::LoadUserProfileW(LinkedToken.LinkedToken, &ProfileInfo))
+    //    {
+
+    //        //hr = g_ResourceManagement.pNSudoClient->GetTokenInformation(UserToken, TokenLogonSid);
+
+    //        //wchar_t NameBuffer[260];
+    //        //DWORD LengthNeeded = 0;
+    //        //::GetUserObjectInformationW(
+    //        //    //::GetProcessWindowStation(),
+    //        //    ::GetThreadDesktop(::GetCurrentThreadId()),
+    //        //    UOI_NAME,
+    //        //    NameBuffer,
+    //        //    sizeof(NameBuffer),
+    //        //    &LengthNeeded);
+
+    //        /*DWORD ReturnLength = 0;
+    //        hr = g_ResourceManagement.pNSudoClient->GetTokenInformation(
+    //            UserToken,
+    //            TokenSessionId,
+    //            &dwSessionID,
+    //            sizeof(DWORD),
+    //            &ReturnLength);*/
+
+    //        //::ImpersonateLoggedOnUser(UserToken);
+    //        NSudoCreateProcess(
+    //            LinkedToken.LinkedToken,
+    //            L"E:\\source\\repos\\GUIDemoForLegacyWindows\\Release\\GUIDemoForLegacyWindows.exe",
+    //            nullptr,
+    //            INFINITE);
+
+    //        HRESULT hr2 = ::GetLastError();
+    //        hr2 = hr2;
+
+    //        ::UnloadUserProfile(LinkedToken.LinkedToken, ProfileInfo.hProfile);
+    //    }
+
+    //    ::CloseHandle(UserToken);
+    //}
+
+
+    // 0xc0000142
+
+    
+    
+
+
+
+
     bool bArgErr = false;
 
     M2::CHandle hToken;
@@ -846,17 +858,6 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         DisableAllPrivileges
     };
 
-    enum class NSudoOptionProcessPriorityValue
-    {
-        Default,
-        Idle,
-        BelowNormal,
-        Normal,
-        AboveNormal,
-        High,
-        RealTime
-    };
-
     enum class NSudoOptionWindowModeValue
     {
         Default,
@@ -870,8 +871,6 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         NSudoOptionUserValue::Default;
     NSudoOptionPrivilegesValue PrivilegesMode =
         NSudoOptionPrivilegesValue::Default;
-    NSudoOptionProcessPriorityValue ProcessPriorityMode =
-        NSudoOptionProcessPriorityValue::Default;
     NSudoOptionWindowModeValue WindowMode =
         NSudoOptionWindowModeValue::Default;
 
@@ -882,6 +881,9 @@ NSUDO_MESSAGE NSudoCommandLineParser(
 
     NSUDO_MANDATORY_LABEL_TYPE MandatoryLabelType =
         NSUDO_MANDATORY_LABEL_TYPE::UNTRUSTED;
+
+    NSUDO_PROCESS_PRIORITY_CLASS_TYPE ProcessPriorityClassType =
+        NSUDO_PROCESS_PRIORITY_CLASS_TYPE::NORMAL;
 
     for (auto& OptionAndParameter : OptionsAndParameters)
     {
@@ -961,27 +963,27 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         {
             if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"Idle"))
             {
-                ProcessPriorityMode = NSudoOptionProcessPriorityValue::Idle;
+                ProcessPriorityClassType = NSUDO_PROCESS_PRIORITY_CLASS_TYPE::IDLE;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"BelowNormal"))
             {
-                ProcessPriorityMode = NSudoOptionProcessPriorityValue::BelowNormal;
+                ProcessPriorityClassType = NSUDO_PROCESS_PRIORITY_CLASS_TYPE::BELOW_NORMAL;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"Normal"))
             {
-                ProcessPriorityMode = NSudoOptionProcessPriorityValue::Normal;
+                ProcessPriorityClassType = NSUDO_PROCESS_PRIORITY_CLASS_TYPE::NORMAL;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"AboveNormal"))
             {
-                ProcessPriorityMode = NSudoOptionProcessPriorityValue::AboveNormal;
+                ProcessPriorityClassType = NSUDO_PROCESS_PRIORITY_CLASS_TYPE::ABOVE_NORMAL;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"High"))
             {
-                ProcessPriorityMode = NSudoOptionProcessPriorityValue::High;
+                ProcessPriorityClassType = NSUDO_PROCESS_PRIORITY_CLASS_TYPE::HIGH;
             }
             else if (0 == _wcsicmp(OptionAndParameter.second.c_str(), L"RealTime"))
             {
-                ProcessPriorityMode = NSudoOptionProcessPriorityValue::RealTime;
+                ProcessPriorityClassType = NSUDO_PROCESS_PRIORITY_CLASS_TYPE::REALTIME;
             }
             else
             {
@@ -1132,33 +1134,6 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         }
     }
 
-    DWORD ProcessPriority = 0;
-
-    if (NSudoOptionProcessPriorityValue::Idle == ProcessPriorityMode)
-    {
-        ProcessPriority = IDLE_PRIORITY_CLASS;
-    }
-    else if (NSudoOptionProcessPriorityValue::BelowNormal == ProcessPriorityMode)
-    {
-        ProcessPriority = BELOW_NORMAL_PRIORITY_CLASS;
-    }
-    else if (NSudoOptionProcessPriorityValue::Normal == ProcessPriorityMode)
-    {
-        ProcessPriority = NORMAL_PRIORITY_CLASS;
-    }
-    else if (NSudoOptionProcessPriorityValue::AboveNormal == ProcessPriorityMode)
-    {
-        ProcessPriority = ABOVE_NORMAL_PRIORITY_CLASS;
-    }
-    else if (NSudoOptionProcessPriorityValue::High == ProcessPriorityMode)
-    {
-        ProcessPriority = HIGH_PRIORITY_CLASS;
-    }
-    else if (NSudoOptionProcessPriorityValue::RealTime == ProcessPriorityMode)
-    {
-        ProcessPriority = REALTIME_PRIORITY_CLASS;
-    }
-
     if (NSudoOptionWindowModeValue::Show == WindowMode)
     {
         ShowWindowMode = SW_SHOW;
@@ -1181,14 +1156,73 @@ NSUDO_MESSAGE NSudoCommandLineParser(
         return NSUDO_MESSAGE::INVALID_COMMAND_PARAMETER;
     }
 
-    if (!NSudoCreateProcess(
-        hToken,
-        UnresolvedCommandLine.c_str(),
-        CurrentDirectory.c_str(),
-        WaitInterval,
-        ProcessPriority,
-        ShowWindowMode,
-        CreateNewConsole))
+    DWORD dwCreationFlags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
+
+    if (CreateNewConsole)
+    {
+        dwCreationFlags |= CREATE_NEW_CONSOLE;
+    }
+
+    STARTUPINFOW StartupInfo = { 0 };
+    PROCESS_INFORMATION ProcessInfo = { 0 };
+
+    StartupInfo.cb = sizeof(STARTUPINFOW);
+
+    StartupInfo.lpDesktop = const_cast<LPWSTR>(L"WinSta0\\Default");
+
+    StartupInfo.dwFlags |= STARTF_USESHOWWINDOW;
+    StartupInfo.wShowWindow = static_cast<WORD>(ShowWindowMode);
+
+    LPVOID lpEnvironment = nullptr;
+
+    BOOL result = FALSE;
+
+    M2::CHandle hCurrentToken;
+    if (g_ResourceManagement.pNSudoClient->OpenCurrentProcessToken(
+        MAXIMUM_ALLOWED, &hCurrentToken) == S_OK)
+    {
+        if (CreateEnvironmentBlock(&lpEnvironment, hToken, TRUE))
+        {
+            std::wstring ExpandedString;
+
+            if (SUCCEEDED(M2ExpandEnvironmentStrings(
+                ExpandedString,
+                UnresolvedCommandLine.c_str())))
+            {
+                result = CreateProcessAsUserW(
+                    hToken,
+                    nullptr,
+                    const_cast<LPWSTR>(ExpandedString.c_str()),
+                    nullptr,
+                    nullptr,
+                    FALSE,
+                    dwCreationFlags,
+                    lpEnvironment,
+                    CurrentDirectory.c_str(),
+                    &StartupInfo,
+                    &ProcessInfo);
+
+                if (result)
+                {
+                    g_ResourceManagement.pNSudoClient->SetProcessPriorityClass(
+                        ProcessInfo.hProcess,
+                        ProcessPriorityClassType);
+
+                    ResumeThread(ProcessInfo.hThread);
+
+                    WaitForSingleObjectEx(
+                        ProcessInfo.hProcess, WaitInterval, FALSE);
+
+                    M2CloseHandle(ProcessInfo.hProcess);
+                    M2CloseHandle(ProcessInfo.hThread);
+                }
+            }
+
+            DestroyEnvironmentBlock(lpEnvironment);
+        }
+    }
+
+    if (!result)
     {
         return NSUDO_MESSAGE::CREATE_PROCESS_FAILED;
     }

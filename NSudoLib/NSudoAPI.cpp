@@ -18,6 +18,9 @@
 #include <WtsApi32.h>
 #pragma comment(lib, "WtsApi32.lib")
 
+#include <Userenv.h>
+#pragma comment(lib, "Userenv.lib")
+
 /**
  * NSudo Shared Library Memory Manager Interface Implementation
  */
@@ -980,6 +983,148 @@ public:
 
         return S_OK;
     }
+
+    /**
+     * @remark You can read the definition for this method in "NSudoAPI.h".
+     */
+    virtual HRESULT STDMETHODCALLTYPE SetProcessPriorityClass(
+        _In_ HANDLE ProcessHandle,
+        _In_ NSUDO_PROCESS_PRIORITY_CLASS_TYPE ProcessPriorityClassType)
+    {
+        DWORD ProcessPriority;
+        switch (ProcessPriorityClassType)
+        {
+        case NSUDO_PROCESS_PRIORITY_CLASS_TYPE::IDLE:
+            ProcessPriority = IDLE_PRIORITY_CLASS;
+            break;
+        case NSUDO_PROCESS_PRIORITY_CLASS_TYPE::BELOW_NORMAL:
+            ProcessPriority = BELOW_NORMAL_PRIORITY_CLASS;
+            break;
+        case NSUDO_PROCESS_PRIORITY_CLASS_TYPE::NORMAL:
+            ProcessPriority = NORMAL_PRIORITY_CLASS;
+            break;
+        case NSUDO_PROCESS_PRIORITY_CLASS_TYPE::ABOVE_NORMAL:
+            ProcessPriority = ABOVE_NORMAL_PRIORITY_CLASS;
+            break;
+        case NSUDO_PROCESS_PRIORITY_CLASS_TYPE::HIGH:
+            ProcessPriority = HIGH_PRIORITY_CLASS;
+            break;
+        case NSUDO_PROCESS_PRIORITY_CLASS_TYPE::REALTIME:
+            ProcessPriority = REALTIME_PRIORITY_CLASS;
+            break;
+        default:
+            return E_INVALIDARG;
+        }
+
+        if (!::SetPriorityClass(ProcessHandle, ProcessPriority))
+        {
+            return ::HRESULT_FROM_WIN32(::GetLastError());
+        }
+
+        return S_OK;
+    }
+
+    /*virtual HRESULT STDMETHODCALLTYPE ExCreateFile()
+    {
+        return E_NOTIMPL;
+    }
+
+    virtual HRESULT STDMETHODCALLTYPE ExRegCreateKey()
+    {
+        return E_NOTIMPL;
+    }
+
+    virtual HRESULT STDMETHODCALLTYPE CreateAppContainer(
+        _In_ PCWSTR AppContainerName,
+        _In_ PCWSTR DisplayName,
+        _In_ PCWSTR Description,
+        _In_opt_ PSID_AND_ATTRIBUTES Capabilities,
+        _In_ DWORD CapabilityCount,
+        _Out_ PSID* AppContainerSid)
+    {
+        HRESULT hr = S_OK;
+
+        HMODULE Module = ::LoadLibraryExW(
+            L"userenv.dll",
+            nullptr,
+            LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (Module)
+        {
+            decltype(::CreateAppContainerProfile)* Procedure =
+                reinterpret_cast<decltype(::CreateAppContainerProfile)*>(
+                    ::GetProcAddress(Module, "CreateAppContainerProfile"));
+            if (Procedure)
+            {
+                hr = Procedure(
+                    AppContainerName,
+                    DisplayName,
+                    Description,
+                    Capabilities,
+                    CapabilityCount,
+                    AppContainerSid);
+            }
+            else
+            {
+                hr = ::HRESULT_FROM_WIN32(::GetLastError());
+            }
+
+            ::FreeLibrary(Module);
+        }
+        else
+        {
+            hr = ::HRESULT_FROM_WIN32(::GetLastError());
+        }
+
+        return hr ;
+    }
+
+    virtual HRESULT STDMETHODCALLTYPE DeleteAppContainer(
+        _In_ PCWSTR AppContainerName)
+    {
+        HRESULT hr = S_OK;
+
+        HMODULE Module = ::LoadLibraryExW(
+            L"userenv.dll",
+            nullptr,
+            LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (Module)
+        {
+            decltype(::DeleteAppContainerProfile)* Procedure =
+                reinterpret_cast<decltype(::DeleteAppContainerProfile)*>(
+                    ::GetProcAddress(Module, "DeleteAppContainerProfile"));
+            if (Procedure)
+            {
+                hr = Procedure(AppContainerName);
+            }
+            else
+            {
+                hr = ::HRESULT_FROM_WIN32(::GetLastError());
+            }
+
+            ::FreeLibrary(Module);
+        }
+        else
+        {
+            hr = ::HRESULT_FROM_WIN32(::GetLastError());
+        }
+
+        return hr;
+    }
+
+    virtual HRESULT STDMETHODCALLTYPE CreateAppContainerContext()
+    {
+        return E_NOTIMPL;
+    }
+
+    virtual HRESULT STDMETHODCALLTYPE ExExpandEnvironmentStrings()
+    {
+        return E_NOTIMPL;
+    }
+
+    virtual HRESULT STDMETHODCALLTYPE ExCreateProcess()
+    {
+        return E_NOTIMPL;
+    }*/
 };
 
 /**
