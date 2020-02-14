@@ -141,7 +141,7 @@ namespace M2
 
         static inline void Close(HANDLE Object)
         {
-            M2CloseHandle(Object);
+            ::MileCloseHandle(Object);
         }
     };
 
@@ -340,20 +340,26 @@ namespace M2
 
         DWORD Resume()
         {
-            return ResumeThread(this->m_Thread);
+            DWORD PreviousSuspendCount = static_cast<DWORD>(-1);
+            ::MileResumeThread(this->m_Thread, &PreviousSuspendCount);
+            return PreviousSuspendCount;
         }
 
         DWORD Suspend()
         {
-            return SuspendThread(this->m_Thread);
+            DWORD PreviousSuspendCount = static_cast<DWORD>(-1);
+            ::MileSuspendThread(this->m_Thread, &PreviousSuspendCount);
+            return PreviousSuspendCount;
         }
 
         DWORD Wait(
             _In_ DWORD dwMilliseconds = INFINITE,
             _In_ BOOL bAlertable = FALSE)
         {
-            return WaitForSingleObjectEx(
-                this->m_Thread, dwMilliseconds, bAlertable);
+            DWORD Result = WAIT_FAILED;
+            ::MileWaitForSingleObject(
+                this->m_Thread, dwMilliseconds, bAlertable, &Result);
+            return Result;
         }
 
     };
@@ -641,55 +647,6 @@ namespace M2
 
 #ifndef _M2_WINDOWS_BASE_EXTENDED_HELPERS_
 #define _M2_WINDOWS_BASE_EXTENDED_HELPERS_
-
-/**
- * Allocates a block of memory from the default heap of the calling process.
- * The allocated memory will be initialized to zero. The allocated memory is
- * not movable.
- *
- * @param AllocatedMemoryBlock A pointer to the allocated memory block.
- * @param MemoryBlockSize The number of bytes to be allocated.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2AllocMemory(
-    _Out_ PVOID* AllocatedMemoryBlock,
-    _In_ SIZE_T MemoryBlockSize);
-
-/**
- * Reallocates a block of memory from the default heap of the calling process.
- * If the reallocation request is for a larger size, the additional region of
- * memory beyond the original size be initialized to zero. This function
- * enables you to resize a memory block and change other memory block
- * properties. The allocated memory is not movable.
- *
- * @param NewAllocatedMemoryBlock A pointer to the allocated memory block.
- * @param OldAllocatedMemoryBlock A pointer to the block of memory that the
- *                                function reallocates. This pointer is
- *                                returned by an earlier call to the
- *                                M2AllocMemory or M2ReAllocMemory function.
- * @param NewMemoryBlockSize The new size of the memory block, in bytes. A
- *                           memory block's size can be increased or decreased
- *                           by using this function.
- * @return HRESULT. If the function succeeds, the return value is S_OK. If the
- *         function fails, the original memory is not freed, and the original
- *         handle and pointer are still valid.
- */
-HRESULT M2ReAllocMemory(
-    _Out_ PVOID* NewAllocatedMemoryBlock,
-    _In_ PVOID OldAllocatedMemoryBlock,
-    _In_ SIZE_T NewMemoryBlockSize);
-
-/**
- * Frees a memory block allocated from a heap by the M2AllocMemory and
- * M2ReAllocMemory function.
- *
- * @param AllocatedMemoryBlock A pointer to the memory block to be freed. This
- * pointer is returned by the M2AllocMemory or M2ReAllocMemory function. If
- * this pointer is nullptr, the behavior is undefined.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2FreeMemory(
-    _In_ PVOID AllocatedMemoryBlock);
 
 /**
  * Retrieves file system attributes for a specified file or directory.
@@ -1292,18 +1249,6 @@ HRESULT M2LoadLibraryEx(
 #pragma endregion
 
 #pragma region Environment
-
-/**
- * Expands environment-variable strings and replaces them with the values
- * defined for the current user.
- *
- * @param ExpandedString The expanded string.
- * @param VariableName The environment-variable string you need to expand.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2ExpandEnvironmentStrings(
-    std::wstring& ExpandedString,
-    const std::wstring& VariableName);
 
 /**
  * Retrieves the path of the system directory.

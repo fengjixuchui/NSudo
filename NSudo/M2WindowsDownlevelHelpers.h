@@ -13,7 +13,7 @@
 #ifndef _M2_WINDOWS_DOWNLEVEL_HELPERS_
 #define _M2_WINDOWS_DOWNLEVEL_HELPERS_
 
-#include <Windows.h>
+#include <Mile.Windows.h>
 
 /**
  * Retrieves the calling thread's last-error code value. The last-error code is
@@ -50,71 +50,6 @@ HRESULT M2GetLastHResultError(
     _In_ BOOL UseLastErrorWhenSucceeded = FALSE);
 
 /**
- * Allocates a block of memory from a heap. The allocated memory is not
- * movable.
- *
- * @param lpNewMem A pointer to the allocated memory block.
- * @param hHeap A handle to the heap from which the memory will be allocated.
- * @param dwFlags The heap allocation options.
- * @param dwBytes The number of bytes to be allocated.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark For more information, see HeapAlloc.
- */
-HRESULT M2HeapAlloc(
-    _Out_ PVOID* lpNewMem,
-    _In_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ SIZE_T dwBytes);
-
-/**
- * Reallocates a block of memory from a heap. This function enables you to
- * resize a memory block and change other memory block properties. The
- * allocated memory is not movable.
- *
- * @param lpNewMem A pointer to the allocated memory block.
- * @param hHeap A handle to the heap from which the memory is to be
- *              reallocated.
- * @param dwFlags The heap reallocation options.
- * @param lpMem A pointer to the block of memory that the function reallocates.
- * @param dwBytes The new size of the memory block, in bytes.
- * @return HRESULT. If the function succeeds, the return value is S_OK. If the
- *         function fails, the original memory is not freed, and the original
- *         handle and pointer are still valid.
- * @remark For more information, see HeapReAlloc.
- */
-HRESULT M2HeapReAlloc(
-    _Out_ PVOID* lpNewMem,
-    _Inout_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ LPVOID lpMem,
-    _In_ SIZE_T dwBytes);
-
-/**
- * Frees a memory block allocated from a heap by the M2HeapAlloc and
- * M2HeapReAlloc function.
- *
- * @param hHeap A handle to the heap whose memory block is to be freed.
- * @param dwFlags The heap free options.
- * @param lpMem A pointer to the memory block to be freed.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark For more information, see HeapFree.
- */
-HRESULT M2HeapFree(
-    _Inout_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ LPVOID lpMem);
-
-/**
- * Closes an open object handle.
- *
- * @param hObject A valid handle to an open object.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark For more information, see CloseHandle.
- */
-HRESULT M2CloseHandle(
-    _In_ HANDLE hObject);
-
-/**
  * Creates a thread to execute within the virtual address space of the calling
  * process.
  *
@@ -147,14 +82,6 @@ HRESULT M2CreateThread(
  * @return The number of logical processors in the current group.
  */
 DWORD M2GetNumberOfHardwareThreads();
-
-/**
- * Retrieves the number of milliseconds that have elapsed since the system was
- * started.
- *
- * @return The number of milliseconds.
- */
-ULONGLONG M2GetTickCount();
 
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 

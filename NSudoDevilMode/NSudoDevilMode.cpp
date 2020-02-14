@@ -10,95 +10,47 @@
 
 #include <Windows.h>
 
-#include <vector>
+#include <stdint.h>
 
 #include "MINT.h"
-#include "Detours/detours.h"
+#include "detours.h"
 
-NTSTATUS NSudoDevilModeCreatePrivilegedToken(
-    _Out_ PHANDLE NewTokenHandle)
+namespace FunctionType
 {
-    *NewTokenHandle = INVALID_HANDLE_VALUE;
-
-    NTSTATUS Status = STATUS_SUCCESS;
-    HANDLE CurrentProcessToken = INVALID_HANDLE_VALUE;
-
-    Status = ::NtOpenProcessToken(
-        NtCurrentProcess(),
-        MAXIMUM_ALLOWED,
-        &CurrentProcessToken);
-    if (NT_SUCCESS(Status))
+    enum
     {
-        SECURITY_QUALITY_OF_SERVICE SQOS;
-        SQOS.Length = sizeof(SECURITY_QUALITY_OF_SERVICE);
-        SQOS.ImpersonationLevel = SecurityImpersonation;
-        SQOS.ContextTrackingMode = FALSE;
-        SQOS.EffectiveOnly = FALSE;
+        NtCreateKey,
+        NtCreateKeyTransacted,
+        NtOpenKey,
+        NtOpenKeyTransacted,
+        NtCreateFile,
+        NtOpenFile,
 
-        OBJECT_ATTRIBUTES OA;
-        OA.Length = sizeof(OBJECT_ATTRIBUTES);
-        OA.RootDirectory = nullptr;
-        OA.ObjectName = nullptr;
-        OA.Attributes = 0;
-        OA.SecurityDescriptor = nullptr;
-        OA.SecurityQualityOfService = &SQOS;
+        NtOpenKeyEx,
+        NtOpenKeyTransactedEx,
 
-        Status = ::NtDuplicateToken(
-            CurrentProcessToken,
-            MAXIMUM_ALLOWED,
-            &OA,
-            FALSE,
-            TokenImpersonation,
-            NewTokenHandle);
-
-        ::NtClose(CurrentProcessToken);
-    }
-
-    if (NT_SUCCESS(Status))
-    {
-        uint8_t TPRawBlock[2 * sizeof(LUID_AND_ATTRIBUTES) + sizeof(DWORD)];
-        PTOKEN_PRIVILEGES pTP = reinterpret_cast<PTOKEN_PRIVILEGES>(TPRawBlock);
-        if (pTP)
-        {
-            pTP->PrivilegeCount = 2;
-
-            pTP->Privileges[0].Luid.LowPart = SE_BACKUP_PRIVILEGE;
-            pTP->Privileges[0].Luid.HighPart = 0;
-            pTP->Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-            pTP->Privileges[1].Luid.LowPart = SE_RESTORE_PRIVILEGE;
-            pTP->Privileges[1].Luid.HighPart = 0;
-            pTP->Privileges[1].Attributes = SE_PRIVILEGE_ENABLED;
-
-            Status = ::NtAdjustPrivilegesToken(
-                *NewTokenHandle,
-                FALSE,
-                pTP,
-                sizeof(TPRawBlock),
-                nullptr,
-                nullptr);
-            if (ERROR_SUCCESS != Status)
-            {
-                ::NtClose(*NewTokenHandle);
-                *NewTokenHandle = INVALID_HANDLE_VALUE;
-
-                Status = STATUS_NOT_SUPPORTED;
-            }
-        }
-    }
-
-    return Status;
+        MaxFunctionType
+    };
 }
 
-static NTSTATUS g_CreatePrivilegedTokenStatus = STATUS_SUCCESS;
-static HANDLE g_PrivilegedAccessToken = INVALID_HANDLE_VALUE;
+typedef struct _NSUDO_DEVIL_MODE_SHARED_DATA
+{
+    HANDLE PrivilegedToken;
+
+    PVOID OriginalAddress[FunctionType::MaxFunctionType];
+    PVOID DetouredAddress[FunctionType::MaxFunctionType];
+
+} NSUDO_DEVIL_MODE_SHARED_DATA, *PNSUDO_DEVIL_MODE_SHARED_DATA;
+
+static NSUDO_DEVIL_MODE_SHARED_DATA g_SharedData;
+
 
 NTSTATUS NSudoDevilModeEnterPrivilegedContext(
     _Out_ PHANDLE OriginalTokenHandle)
 {
-    if (!NT_SUCCESS(g_CreatePrivilegedTokenStatus))
+    if (g_SharedData.PrivilegedToken == INVALID_HANDLE_VALUE)
     {
-        return g_CreatePrivilegedTokenStatus;
+        return STATUS_NOT_SUPPORTED;
     }
 
     if (!NT_SUCCESS(::NtOpenThreadToken(
@@ -113,7 +65,7 @@ NTSTATUS NSudoDevilModeEnterPrivilegedContext(
     return ::NtSetInformationThread(
         NtCurrentThread(),
         ThreadImpersonationToken,
-        &g_PrivilegedAccessToken,
+        &g_SharedData.PrivilegedToken,
         sizeof(HANDLE));
 }
 
@@ -135,37 +87,6 @@ NTSTATUS NSudoDevilModeLeavePrivilegedContext(
     return Status;
 }
 
-namespace FunctionType
-{
-    enum
-    {
-        NtCreateKey,
-        NtCreateKeyTransacted,
-        NtOpenKey,
-        NtOpenKeyTransacted,
-        NtOpenKeyEx,
-        NtOpenKeyTransactedEx,
-
-        NtCreateFile,
-        NtOpenFile,
-
-        MaxFunctionType
-    };
-}
-
-
-static PVOID OriginalAddress[FunctionType::MaxFunctionType] =
-{
-    ::NtCreateKey,
-    ::NtCreateKeyTransacted,
-    ::NtOpenKey,
-    ::NtOpenKeyTransacted,
-    nullptr,
-    nullptr,
-    ::NtCreateFile,
-    ::NtOpenFile
-};
-
 
 NTSTATUS NTAPI OriginalNtCreateKey(
     _Out_ PHANDLE KeyHandle,
@@ -177,7 +98,7 @@ NTSTATUS NTAPI OriginalNtCreateKey(
     _Out_opt_ PULONG Disposition)
 {
     return reinterpret_cast<decltype(NtCreateKey)*>(
-        OriginalAddress[FunctionType::NtCreateKey])(
+        g_SharedData.OriginalAddress[FunctionType::NtCreateKey])(
             KeyHandle,
             DesiredAccess,
             ObjectAttributes,
@@ -233,7 +154,7 @@ NTSTATUS NTAPI OriginalNtCreateKeyTransacted(
     _Out_opt_ PULONG Disposition)
 {
     return reinterpret_cast<decltype(NtCreateKeyTransacted)*>(
-        OriginalAddress[FunctionType::NtCreateKeyTransacted])(
+        g_SharedData.OriginalAddress[FunctionType::NtCreateKeyTransacted])(
             KeyHandle,
             DesiredAccess,
             ObjectAttributes,
@@ -287,7 +208,7 @@ NTSTATUS NTAPI OriginalNtOpenKey(
     _In_ POBJECT_ATTRIBUTES ObjectAttributes)
 {
     return reinterpret_cast<decltype(NtOpenKey)*>(
-        OriginalAddress[FunctionType::NtOpenKey])(
+        g_SharedData.OriginalAddress[FunctionType::NtOpenKey])(
             KeyHandle,
             DesiredAccess,
             ObjectAttributes);
@@ -330,7 +251,7 @@ NTSTATUS NTAPI OriginalNtOpenKeyTransacted(
     _In_ HANDLE TransactionHandle)
 {
     return reinterpret_cast<decltype(NtOpenKeyTransacted)*>(
-        OriginalAddress[FunctionType::NtOpenKeyTransacted])(
+        g_SharedData.OriginalAddress[FunctionType::NtOpenKeyTransacted])(
             KeyHandle,
             DesiredAccess,
             ObjectAttributes,
@@ -376,7 +297,7 @@ NTSTATUS NTAPI OriginalNtOpenKeyEx(
     _In_ ULONG OpenOptions)
 {
     return reinterpret_cast<decltype(NtOpenKeyEx)*>(
-        OriginalAddress[FunctionType::NtOpenKeyEx])(
+        g_SharedData.OriginalAddress[FunctionType::NtOpenKeyEx])(
             KeyHandle,
             DesiredAccess,
             ObjectAttributes,
@@ -420,7 +341,7 @@ NTSTATUS NTAPI OriginalNtOpenKeyTransactedEx(
     _In_ HANDLE TransactionHandle)
 {
     return reinterpret_cast<decltype(NtOpenKeyTransactedEx)*>(
-        OriginalAddress[FunctionType::NtOpenKeyTransactedEx])(
+        g_SharedData.OriginalAddress[FunctionType::NtOpenKeyTransactedEx])(
             KeyHandle,
             DesiredAccess,
             ObjectAttributes,
@@ -473,7 +394,7 @@ NTSTATUS NTAPI OriginalNtCreateFile(
     _In_ ULONG EaLength)
 {
     return reinterpret_cast<decltype(NtCreateFile)*>(
-        OriginalAddress[FunctionType::NtCreateFile])(
+        g_SharedData.OriginalAddress[FunctionType::NtCreateFile])(
             FileHandle,
             DesiredAccess,
             ObjectAttributes,
@@ -540,7 +461,7 @@ NTSTATUS NTAPI OriginalNtOpenFile(
     _In_ ULONG OpenOptions)
 {
     return reinterpret_cast<decltype(NtOpenFile)*>(
-        OriginalAddress[FunctionType::NtOpenFile])(
+        g_SharedData.OriginalAddress[FunctionType::NtOpenFile])(
             FileHandle,
             DesiredAccess,
             ObjectAttributes,
@@ -581,72 +502,157 @@ NTSTATUS NTAPI DetouredNtOpenFile(
     return Status;
 }
 
-
-static PVOID DetouredAddress[FunctionType::MaxFunctionType] =
-{
-    DetouredNtCreateKey,
-    DetouredNtCreateKeyTransacted,
-    DetouredNtOpenKey,
-    DetouredNtOpenKeyTransacted,
-    DetouredNtOpenKeyEx,
-    DetouredNtOpenKeyTransactedEx,
-    DetouredNtCreateFile,
-    DetouredNtOpenFile
-};
-
 /**
  * Initialize the NSudo Devil Mode.
  */
-EXTERN_C void WINAPI NSudoDevilModeInitialize()
+void NSudoDevilModeInitialize()
 {
-    g_CreatePrivilegedTokenStatus = NSudoDevilModeCreatePrivilegedToken(
-        &g_PrivilegedAccessToken);
+    NTSTATUS Status = STATUS_SUCCESS;
+    HANDLE CurrentProcessToken = INVALID_HANDLE_VALUE;
 
-    HMODULE ModuleHandle = ::GetModuleHandleW(L"ntdll.dll");
-
-    if (ModuleHandle)
+    Status = ::NtOpenProcessToken(
+        NtCurrentProcess(),
+        MAXIMUM_ALLOWED,
+        &CurrentProcessToken);
+    if (NT_SUCCESS(Status))
     {
-        OriginalAddress[FunctionType::NtOpenKeyEx] =
-            ::GetProcAddress(ModuleHandle, "NtOpenKeyEx");
-        OriginalAddress[FunctionType::NtOpenKeyTransactedEx] =
-            ::GetProcAddress(ModuleHandle, "NtOpenKeyTransactedEx");
+        SECURITY_QUALITY_OF_SERVICE SQOS;
+        SQOS.Length = sizeof(SECURITY_QUALITY_OF_SERVICE);
+        SQOS.ImpersonationLevel = SecurityImpersonation;
+        SQOS.ContextTrackingMode = FALSE;
+        SQOS.EffectiveOnly = FALSE;
+
+        OBJECT_ATTRIBUTES OA;
+        OA.Length = sizeof(OBJECT_ATTRIBUTES);
+        OA.RootDirectory = nullptr;
+        OA.ObjectName = nullptr;
+        OA.Attributes = 0;
+        OA.SecurityDescriptor = nullptr;
+        OA.SecurityQualityOfService = &SQOS;
+
+        Status = ::NtDuplicateToken(
+            CurrentProcessToken,
+            MAXIMUM_ALLOWED,
+            &OA,
+            FALSE,
+            TokenImpersonation,
+            &g_SharedData.PrivilegedToken);
+
+        ::NtClose(CurrentProcessToken);
     }
 
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-
-    for (size_t i = 0; i < FunctionType::MaxFunctionType; ++i)
+    if (NT_SUCCESS(Status))
     {
-        if (OriginalAddress[i])
+        uint8_t TPBlock[2 * sizeof(LUID_AND_ATTRIBUTES) + sizeof(DWORD)];
+        PTOKEN_PRIVILEGES pTP = reinterpret_cast<PTOKEN_PRIVILEGES>(TPBlock);
+
+        pTP->PrivilegeCount = 2;
+
+        pTP->Privileges[0].Luid.LowPart = SE_BACKUP_PRIVILEGE;
+        pTP->Privileges[0].Luid.HighPart = 0;
+        pTP->Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+        pTP->Privileges[1].Luid.LowPart = SE_RESTORE_PRIVILEGE;
+        pTP->Privileges[1].Luid.HighPart = 0;
+        pTP->Privileges[1].Attributes = SE_PRIVILEGE_ENABLED;
+
+        Status = ::NtAdjustPrivilegesToken(
+            g_SharedData.PrivilegedToken,
+            FALSE,
+            pTP,
+            sizeof(TPBlock),
+            nullptr,
+            nullptr);
+        if (ERROR_SUCCESS != Status)
         {
-            DetourAttach(&OriginalAddress[i], DetouredAddress[i]);
+            ::NtClose(g_SharedData.PrivilegedToken);
+            Status = STATUS_NOT_SUPPORTED;
         }
     }
 
-    DetourTransactionCommit();
+    if (!NT_SUCCESS(Status))
+    {
+        g_SharedData.PrivilegedToken = INVALID_HANDLE_VALUE;
+    }
+
+    g_SharedData.OriginalAddress[FunctionType::NtCreateKey] =
+        ::NtCreateKey;
+    g_SharedData.DetouredAddress[FunctionType::NtCreateKey] =
+        ::DetouredNtCreateKey;
+
+    g_SharedData.OriginalAddress[FunctionType::NtCreateKeyTransacted] =
+        ::NtCreateKeyTransacted;
+    g_SharedData.DetouredAddress[FunctionType::NtCreateKeyTransacted] =
+        ::DetouredNtCreateKeyTransacted;
+
+    g_SharedData.OriginalAddress[FunctionType::NtOpenKey] =
+        ::NtOpenKey;
+    g_SharedData.DetouredAddress[FunctionType::NtOpenKey] =
+        ::DetouredNtOpenKey;
+
+    g_SharedData.OriginalAddress[FunctionType::NtOpenKeyTransacted] =
+        ::NtOpenKeyTransacted;
+    g_SharedData.DetouredAddress[FunctionType::NtOpenKeyTransacted] =
+        ::DetouredNtOpenKeyTransacted;
+
+    g_SharedData.OriginalAddress[FunctionType::NtCreateFile] =
+        ::NtCreateFile;
+    g_SharedData.DetouredAddress[FunctionType::NtCreateFile] =
+        ::DetouredNtCreateFile;
+
+    g_SharedData.OriginalAddress[FunctionType::NtOpenFile] =
+        ::NtOpenFile;
+    g_SharedData.DetouredAddress[FunctionType::NtOpenFile] =
+        ::DetouredNtOpenFile;
+
+    UNICODE_STRING NtdllName;
+    ::RtlInitUnicodeString(
+        &NtdllName,
+        const_cast<PWSTR>(L"ntdll.dll"));
+    PVOID NtdllModuleHandle = nullptr;
+    ::LdrGetDllHandleEx(
+        0,
+        nullptr,
+        nullptr,
+        &NtdllName,
+        &NtdllModuleHandle);
+    if (NtdllModuleHandle)
+    {
+        ANSI_STRING FunctionName;
+
+        ::RtlInitAnsiString(
+            &FunctionName,
+            const_cast<PSTR>("NtOpenKeyEx"));
+        ::LdrGetProcedureAddress(
+            NtdllModuleHandle,
+            &FunctionName,
+            0,
+            &g_SharedData.OriginalAddress[FunctionType::NtOpenKeyEx]);
+        g_SharedData.DetouredAddress[FunctionType::NtOpenKeyEx] =
+            ::DetouredNtOpenKeyEx;
+
+        ::RtlInitAnsiString(
+            &FunctionName,
+            const_cast<PSTR>("NtOpenKeyTransactedEx"));
+        ::LdrGetProcedureAddress(
+            NtdllModuleHandle,
+            &FunctionName,
+            0,
+            &g_SharedData.OriginalAddress[FunctionType::NtOpenKeyTransactedEx]);
+        g_SharedData.DetouredAddress[FunctionType::NtOpenKeyTransactedEx] =
+            ::DetouredNtOpenKeyTransactedEx;
+
+    }
 }
 
 /**
  * Uninitialize the NSudo Devil Mode.
  */
-EXTERN_C void WINAPI NSudoDevilModeUninitialize()
+void NSudoDevilModeUninitialize()
 {
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-
-    for (size_t i = 0; i < FunctionType::MaxFunctionType; ++i)
+    if (g_SharedData.PrivilegedToken != INVALID_HANDLE_VALUE)
     {
-        if (OriginalAddress[i])
-        {
-            DetourDetach(&OriginalAddress[i], DetouredAddress[i]);
-        }
-    }
-
-    DetourTransactionCommit();
-
-    if (NT_SUCCESS(g_CreatePrivilegedTokenStatus))
-    {
-        ::NtClose(g_PrivilegedAccessToken);
+        ::NtClose(g_SharedData.PrivilegedToken);
     }
 }
 
@@ -658,14 +664,58 @@ BOOL APIENTRY DllMain(
     UNREFERENCED_PARAMETER(Module);
     UNREFERENCED_PARAMETER(Reserved);
 
-    if (DLL_PROCESS_ATTACH == Reason)
+    if (DLL_PROCESS_ATTACH == Reason || DLL_PROCESS_DETACH == Reason)
     {
-        NSudoDevilModeInitialize();
-    }
-    else if (DLL_PROCESS_DETACH == Reason)
-    {
-        NSudoDevilModeUninitialize();
+        if (DLL_PROCESS_ATTACH == Reason)
+        {
+            NSudoDevilModeInitialize();
+        }
+
+        DetourTransactionBegin();
+        DetourUpdateThread(NtCurrentThread());
+
+        for (size_t i = 0; i < FunctionType::MaxFunctionType; ++i)
+        {
+            if (g_SharedData.OriginalAddress[i])
+            {
+                if (DLL_PROCESS_ATTACH == Reason)
+                {
+                    DetourAttach(
+                        &g_SharedData.OriginalAddress[i],
+                        g_SharedData.DetouredAddress[i]);
+                }
+                else if (DLL_PROCESS_DETACH == Reason)
+                {
+                    DetourDetach(
+                        &g_SharedData.OriginalAddress[i],
+                        g_SharedData.DetouredAddress[i]);
+                }
+            }
+        }
+
+        DetourTransactionCommit();
+
+        if (DLL_PROCESS_DETACH == Reason)
+        {
+            NSudoDevilModeUninitialize();
+        }
     }
 
     return TRUE;
 }
+
+
+
+
+BOOL APIENTRY libkcrt_DllMain(
+    HMODULE Module,
+    DWORD  Reason,
+    LPVOID Reserved)
+{
+    if (Reason == DLL_PROCESS_ATTACH)
+        __security_init_cookie();
+
+    return DllMain(Module, Reason, Reserved);
+}
+
+#pragma comment(linker, "/entry:libkcrt_DllMain")

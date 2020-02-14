@@ -39,41 +39,6 @@ HRESULT M2GetLastHResultError(
         UseLastErrorWhenSucceeded));
 }
 
-HRESULT M2HeapAlloc(
-    _Out_ PVOID* lpNewMem,
-    _In_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ SIZE_T dwBytes)
-{
-    *lpNewMem = HeapAlloc(hHeap, dwFlags, dwBytes);
-    return *lpNewMem ? S_OK : __HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_MEMORY);
-}
-
-HRESULT M2HeapReAlloc(
-    _Out_ PVOID* lpNewMem,
-    _Inout_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ LPVOID lpMem,
-    _In_ SIZE_T dwBytes)
-{
-    *lpNewMem = HeapReAlloc(hHeap, dwFlags, lpMem, dwBytes);
-    return *lpNewMem ? S_OK : __HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_MEMORY);
-}
-
-HRESULT M2HeapFree(
-    _Inout_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ LPVOID lpMem)
-{
-    return M2GetLastHResultError(HeapFree(hHeap, dwFlags, lpMem));
-}
-
-HRESULT M2CloseHandle(
-    _In_ HANDLE hObject)
-{
-    return M2GetLastHResultError(CloseHandle(hObject));
-}
-
 HRESULT M2CreateThread(
     _Out_ PHANDLE lpThreadHandle,
     _In_opt_ LPSECURITY_ATTRIBUTES lpThreadAttributes,
@@ -106,21 +71,6 @@ DWORD M2GetNumberOfHardwareThreads()
     SYSTEM_INFO SystemInfo = { 0 };
     GetNativeSystemInfo(&SystemInfo);
     return SystemInfo.dwNumberOfProcessors;
-}
-
-ULONGLONG M2GetTickCount()
-{
-    LARGE_INTEGER Frequency = { 0 }, PerformanceCount = { 0 };
-
-    if (QueryPerformanceFrequency(&Frequency))
-    {
-        if (QueryPerformanceCounter(&PerformanceCount))
-        {
-            return (PerformanceCount.QuadPart * 1000 / Frequency.QuadPart);
-        }
-    }
-
-    return GetTickCount64();
 }
 
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)

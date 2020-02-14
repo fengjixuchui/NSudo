@@ -98,7 +98,6 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Condition="'$(Configuration)'=='Release'" Project="..\MSBuild\VC-LTL.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
@@ -130,7 +129,7 @@
       <IntrinsicFunctions Condition="'$(Configuration)'=='Release'">true</IntrinsicFunctions>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding Condition="'$(Configuration)'=='Release'">true</EnableCOMDATFolding>
       <OptimizeReferences Condition="'$(Configuration)'=='Release'">true</OptimizeReferences>
@@ -140,10 +139,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="M2.Base.cpp" />
+    <ClCompile Include="Mile.Windows.cpp" />
     <ClCompile Include="NSudoAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="M2.Base.h" />
+    <ClInclude Include="Mile.Windows.h" />
     <ClInclude Include="NSudoAPI.h" />
   </ItemGroup>
   <ItemGroup>
