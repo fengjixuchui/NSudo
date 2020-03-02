@@ -14,381 +14,48 @@
 
 #ifdef _M2_WINDOWS_BASE_EXTENDED_HELPERS_
 
-/**
- * Retrieves file system attributes for a specified file or directory.
- *
- * @param FileHandle A handle to the file that contains the information to be
- *                   retrieved. This handle should not be a pipe handle.
- * @param FileAttributes The attributes of the specified file or directory.
- *                       For a list of attribute values and their descriptions,
- *                       see File Attribute Constants. If the function fails,
- *                       the return value is INVALID_FILE_ATTRIBUTES.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2GetFileAttributes(
-    _In_ HANDLE FileHandle,
-    _Out_ PDWORD FileAttributes)
+DWORD M2GetLastWin32Error(
+    _In_ BOOL IsLastFunctionCallSucceeded,
+    _In_ BOOL UseLastErrorWhenSucceeded)
 {
-    FILE_BASIC_INFO BasicInfo;
+    if (IsLastFunctionCallSucceeded && !UseLastErrorWhenSucceeded)
+        return ERROR_SUCCESS;
 
-    HRESULT hr = M2GetFileInformation(
-        FileHandle,
-        FileBasicInfo,
-        &BasicInfo,
-        sizeof(FILE_BASIC_INFO));
+    DWORD LastError = GetLastError();
 
-    *FileAttributes = SUCCEEDED(hr)
-        ? BasicInfo.FileAttributes
-        : INVALID_FILE_ATTRIBUTES;
+    if (!IsLastFunctionCallSucceeded && ERROR_SUCCESS == LastError)
+        return ERROR_FUNCTION_FAILED;
 
-    return hr;
+    return LastError;
 }
 
-/**
- * Sets the attributes for a file or directory.
- *
- * @param FileHandle A handle to the file for which to change information. This
- *                   handle must be opened with the appropriate permissions for
- *                   the requested change. This handle should not be a pipe
- *                   handle.
- * @param FileAttributes The file attributes to set for the file. This
- *                       parameter can be one or more values, combined using
- *                       the bitwise - OR operator. However, all other values
- *                       override FILE_ATTRIBUTE_NORMAL. For more information,
- *                       see the SetFileAttributes function.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2SetFileAttributes(
-    _In_ HANDLE FileHandle,
-    _In_ DWORD FileAttributes)
+HRESULT M2GetLastHResultError(
+    _In_ BOOL IsLastFunctionCallSucceeded,
+    _In_ BOOL UseLastErrorWhenSucceeded)
 {
-    FILE_BASIC_INFO BasicInfo = { 0 };
-    BasicInfo.FileAttributes =
-        FileAttributes & (
-            FILE_SHARE_READ |
-            FILE_SHARE_WRITE |
-            FILE_SHARE_DELETE |
-            FILE_ATTRIBUTE_ARCHIVE |
-            FILE_ATTRIBUTE_TEMPORARY |
-            FILE_ATTRIBUTE_OFFLINE |
-            FILE_ATTRIBUTE_NOT_CONTENT_INDEXED |
-            FILE_ATTRIBUTE_NO_SCRUB_DATA) |
-        FILE_ATTRIBUTE_NORMAL;
-
-    return M2SetFileInformation(
-        FileHandle,
-        FileBasicInfo,
-        &BasicInfo,
-        sizeof(FILE_BASIC_INFO));
+    return HRESULT_FROM_WIN32(M2GetLastWin32Error(
+        IsLastFunctionCallSucceeded,
+        UseLastErrorWhenSucceeded));
 }
 
-/**
- * Retrieves the size of the specified file.
- *
- * @param FileHandle A handle to the file that contains the information to be
- *                   retrieved. This handle should not be a pipe handle.
- * @param FileSize A pointer to a ULONGLONG value that receives the file size,
- *                 in bytes.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             GENERIC_READ | SYNCHRONIZE,
- *             FILE_SHARE_READ,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2GetFileSize(
-    _In_ HANDLE FileHandle,
-    _Out_ PULONGLONG FileSize)
+HRESULT M2CoCreateInstance(
+    _In_ LPCWSTR lpszCLSID,
+    _In_opt_ LPUNKNOWN pUnkOuter,
+    _In_ DWORD dwClsContext,
+    _In_ LPCWSTR lpszIID,
+    _Out_ LPVOID* ppv)
 {
-    FILE_STANDARD_INFO StandardInfo;
+    CLSID clsid;
+    IID iid;
 
-    HRESULT hr = M2GetFileInformation(
-        FileHandle,
-        FileStandardInfo,
-        &StandardInfo,
-        sizeof(FILE_STANDARD_INFO));
-
-    *FileSize = SUCCEEDED(hr)
-        ? static_cast<ULONGLONG>(StandardInfo.EndOfFile.QuadPart)
-        : 0;
-
-    return hr;
-}
-
-/**
- * Retrieves the amount of space that is allocated for the file.
- *
- * @param FileHandle A handle to the file that contains the information to be
- *                   retrieved. This handle should not be a pipe handle.
- * @param AllocationSize A pointer to a ULONGLONG value that receives the
- *                       amount of space that is allocated for the file, in
- *                       bytes.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             GENERIC_READ | SYNCHRONIZE,
- *             FILE_SHARE_READ,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2GetFileAllocationSize(
-    _In_ HANDLE FileHandle,
-    _Out_ PULONGLONG AllocationSize)
-{
-    FILE_STANDARD_INFO StandardInfo;
-
-    HRESULT hr = M2GetFileInformation(
-        FileHandle,
-        FileStandardInfo,
-        &StandardInfo,
-        sizeof(FILE_STANDARD_INFO));
-
-    *AllocationSize = SUCCEEDED(hr)
-        ? static_cast<ULONGLONG>(StandardInfo.AllocationSize.QuadPart)
-        : 0;
-
-    return hr;
-}
-
-/**
- * Deletes an existing file.
- *
- * @param FileHandle The handle of the file to be deleted. This handle must be
- *                   opened with the appropriate permissions for the requested
- *                   change. This handle should not be a pipe handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             SYNCHRONIZE | DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
- *             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2DeleteFile(
-    _In_ HANDLE FileHandle)
-{
-    FILE_DISPOSITION_INFO DispostionInfo;
-    DispostionInfo.DeleteFile = TRUE;
-
-    return M2SetFileInformation(
-        FileHandle,
-        FileDispositionInfo,
-        &DispostionInfo,
-        sizeof(FILE_DISPOSITION_INFO));
-}
-
-/**
- * Deletes an existing file, even the file have the readonly attribute.
- *
- * @param FileHandle The handle of the file to be deleted. This handle must be
- *                   opened with the appropriate permissions for the requested
- *                   change. This handle should not be a pipe handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             SYNCHRONIZE | DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
- *             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2DeleteFileIgnoreReadonlyAttribute(
-    _In_ HANDLE FileHandle)
-{
-    HRESULT hr = S_OK;
-    DWORD OldAttribute = 0;
-
-    // Save old attributes.
-    hr = M2GetFileAttributes(
-        FileHandle,
-        &OldAttribute);
-    if (!SUCCEEDED(hr)) return hr;
-
-    // Remove readonly attribute.
-    hr = M2SetFileAttributes(
-        FileHandle,
-        OldAttribute & (-1 ^ FILE_ATTRIBUTE_READONLY));
-    if (!SUCCEEDED(hr)) return hr;
-
-    // Delete the file.
-    hr = M2DeleteFile(FileHandle);
-    if (!SUCCEEDED(hr))
-    {
-        // Restore attributes if failed.
-        hr = M2SetFileAttributes(
-            FileHandle,
-            OldAttribute);
-    }
-
-    return hr;
-}
-
-/**
- * The internal content of the file enumerator handle.
- */
-typedef struct _M2_FILE_ENUMERATOR_OBJECT
-{
-    HANDLE FileHandle;
-    PFILE_ID_BOTH_DIR_INFO CurrentFileInfo;
-    BYTE FileInfoBuffer[32768];
-} M2_FILE_ENUMERATOR_OBJECT, * PM2_FILE_ENUMERATOR_OBJECT;
-
-/**
- * Creates a file enumerator handle for searching a directory for a file or
- * subdirectory with a name.
- *
- * @param FileEnumeratorHandle The file enumerator handle.
- * @param FileHandle The handle of the file to be searched a directory for a
- *                   file or subdirectory with a name. This handle must be
- *                   opened with the appropriate permissions for the requested
- *                   change. This handle should not be a pipe handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             FILE_LIST_DIRECTORY | SYNCHRONIZE,
- *             FILE_SHARE_READ | FILE_SHARE_WRITE,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2CreateFileEnumerator(
-    _Out_ PM2_FILE_ENUMERATOR_HANDLE FileEnumeratorHandle,
-    _In_ HANDLE FileHandle)
-{
-    if ((!FileEnumeratorHandle) || (INVALID_HANDLE_VALUE == FileHandle))
-        return __HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER);
-
-    *FileEnumeratorHandle = nullptr;
-
-    PM2_FILE_ENUMERATOR_OBJECT Object = nullptr;
-    HRESULT hr = ::MileAllocMemory(
-        sizeof(M2_FILE_ENUMERATOR_OBJECT),
-        reinterpret_cast<PVOID*>(&Object));
+    HRESULT hr = CLSIDFromString(lpszCLSID, &clsid);
     if (SUCCEEDED(hr))
     {
-        Object->FileHandle = FileHandle;
-
-        *FileEnumeratorHandle = Object;
-    }
-
-    return hr;
-}
-
-/**
- * Closes a created file enumerator handle.
- *
- * @param FileEnumeratorHandle The created file enumerator handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2CloseFileEnumerator(
-    _In_ M2_FILE_ENUMERATOR_HANDLE FileEnumeratorHandle)
-{
-    if (!FileEnumeratorHandle)
-        return __HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER);
-
-    return ::MileFreeMemory(FileEnumeratorHandle);
-}
-
-/**
- * Starts or continues a file search from a created file enumerator handle.
- *
- * @param FileEnumeratorInformation A pointer to the
- *                                  M2_FILE_ENUMERATOR_INFORMATION structure
- *                                  that receives information about a found
- *                                  file or directory.
- * @param FileEnumeratorHandle The created file enumerator handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2QueryFileEnumerator(
-    _Out_ PM2_FILE_ENUMERATOR_INFORMATION FileEnumeratorInformation,
-    _In_ M2_FILE_ENUMERATOR_HANDLE FileEnumeratorHandle)
-{
-    if ((!FileEnumeratorHandle) || (!FileEnumeratorInformation))
-        return __HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER);
-
-    HRESULT hr = S_OK;
-
-    PM2_FILE_ENUMERATOR_OBJECT Object =
-        reinterpret_cast<PM2_FILE_ENUMERATOR_OBJECT>(FileEnumeratorHandle);
-
-    if (!Object->CurrentFileInfo)
-    {
-        Object->CurrentFileInfo =
-            reinterpret_cast<PFILE_ID_BOTH_DIR_INFO>(Object->FileInfoBuffer);
-
-        hr = M2GetFileInformation(
-            Object->FileHandle,
-            FILE_INFO_BY_HANDLE_CLASS::FileIdBothDirectoryRestartInfo,
-            Object->CurrentFileInfo,
-            sizeof(Object->FileInfoBuffer));
-    }
-    else if (!Object->CurrentFileInfo->NextEntryOffset)
-    {
-        Object->CurrentFileInfo =
-            reinterpret_cast<PFILE_ID_BOTH_DIR_INFO>(Object->FileInfoBuffer);
-        hr = M2GetFileInformation(
-            Object->FileHandle,
-            FILE_INFO_BY_HANDLE_CLASS::FileIdBothDirectoryInfo,
-            Object->CurrentFileInfo,
-            sizeof(Object->FileInfoBuffer));
-    }
-    else
-    {
-        Object->CurrentFileInfo = reinterpret_cast<PFILE_ID_BOTH_DIR_INFO>(
-            reinterpret_cast<ULONG_PTR>(Object->CurrentFileInfo)
-            + Object->CurrentFileInfo->NextEntryOffset);
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        FileEnumeratorInformation->CreationTime.dwHighDateTime =
-            Object->CurrentFileInfo->CreationTime.HighPart;
-        FileEnumeratorInformation->CreationTime.dwLowDateTime =
-            Object->CurrentFileInfo->CreationTime.LowPart;
-        FileEnumeratorInformation->LastAccessTime.dwHighDateTime =
-            Object->CurrentFileInfo->LastAccessTime.HighPart;
-        FileEnumeratorInformation->LastAccessTime.dwLowDateTime =
-            Object->CurrentFileInfo->LastAccessTime.LowPart;
-        FileEnumeratorInformation->LastWriteTime.dwHighDateTime =
-            Object->CurrentFileInfo->LastWriteTime.HighPart;
-        FileEnumeratorInformation->LastWriteTime.dwLowDateTime =
-            Object->CurrentFileInfo->LastWriteTime.LowPart;
-        FileEnumeratorInformation->ChangeTime.dwHighDateTime =
-            Object->CurrentFileInfo->ChangeTime.HighPart;
-        FileEnumeratorInformation->ChangeTime.dwLowDateTime =
-            Object->CurrentFileInfo->ChangeTime.LowPart;
-        FileEnumeratorInformation->FileSize =
-            Object->CurrentFileInfo->EndOfFile;
-        FileEnumeratorInformation->AllocationSize =
-            Object->CurrentFileInfo->AllocationSize;
-        FileEnumeratorInformation->FileAttributes =
-            Object->CurrentFileInfo->FileAttributes;
-        FileEnumeratorInformation->EaSize =
-            Object->CurrentFileInfo->EaSize;
-        FileEnumeratorInformation->FileId =
-            Object->CurrentFileInfo->FileId;
-        wcsncpy_s(
-            FileEnumeratorInformation->ShortName,
-            Object->CurrentFileInfo->ShortName,
-            Object->CurrentFileInfo->ShortNameLength / sizeof(wchar_t));
-        wcsncpy_s(
-            FileEnumeratorInformation->FileName,
-            Object->CurrentFileInfo->FileName,
-            Object->CurrentFileInfo->FileNameLength / sizeof(wchar_t));
+        hr = IIDFromString(lpszIID, &iid);
+        if (SUCCEEDED(hr))
+        {
+            hr = CoCreateInstance(clsid, pUnkOuter, dwClsContext, iid, ppv);
+        }
     }
 
     return hr;
@@ -417,7 +84,7 @@ HRESULT M2RegQueryStringValue(
     *lpData = nullptr;
 
     DWORD cbData = 0;
-    HRESULT hr = M2RegQueryValue(
+    HRESULT hr = ::MileRegQueryValue(
         hKey,
         lpValueName,
         nullptr,
@@ -430,7 +97,7 @@ HRESULT M2RegQueryStringValue(
         if (SUCCEEDED(hr))
         {
             DWORD Type = 0;
-            hr = M2RegQueryValue(
+            hr = ::MileRegQueryValue(
                 hKey,
                 lpValueName,
                 nullptr,
@@ -470,7 +137,7 @@ HRESULT M2CoCheckInterfaceName(
         return E_INVALIDARG;
 
     HKEY hKey = nullptr;
-    HRESULT hr = M2RegCreateKey(
+    HRESULT hr = ::MileRegCreateKey(
         HKEY_CLASSES_ROOT,
         RegistryKeyPath,
         0,
@@ -494,7 +161,7 @@ HRESULT M2CoCheckInterfaceName(
             ::MileFreeMemory(InterfaceTypeName);
         }
 
-        M2RegCloseKey(hKey);
+        ::MileRegCloseKey(hKey);
     }
 
     return hr;
@@ -1364,7 +1031,7 @@ HRESULT M2LoadLibraryEx(
     _In_ LPCWSTR LibraryFileName,
     _In_ DWORD Flags)
 {
-    HRESULT hr = M2LoadLibrary(ModuleHandle, LibraryFileName, nullptr, Flags);
+    HRESULT hr = ::MileLoadLibrary(LibraryFileName, nullptr, Flags, ModuleHandle);
     if (FAILED(hr))
     {
         if ((Flags & LOAD_LIBRARY_SEARCH_SYSTEM32) &&
@@ -1399,11 +1066,11 @@ HRESULT M2LoadLibraryEx(
                     hr = StringCbCatW(Buffer, BufferLength, LibraryFileName);
                     if (SUCCEEDED(hr))
                     {
-                        hr = M2LoadLibrary(
-                            ModuleHandle,
+                        hr = ::MileLoadLibrary(
                             Buffer,
                             nullptr,
-                            Flags & (-1 ^ LOAD_LIBRARY_SEARCH_SYSTEM32));
+                            Flags & (-1 ^ LOAD_LIBRARY_SEARCH_SYSTEM32),
+                            ModuleHandle);
                     }
                 }
             }
@@ -1539,10 +1206,10 @@ INT M2EnablePerMonitorDialogScaling()
     hModule = GetModuleHandleW(L"user32.dll");
     if (!hModule) return -1;
 
-    if (FAILED(M2GetProcAddress(
-        reinterpret_cast<FARPROC*>(&pFunc),
+    if (FAILED(::MileGetProcAddress(
         hModule,
-        reinterpret_cast<LPCSTR>(2577))))
+        reinterpret_cast<LPCSTR>(2577),
+        reinterpret_cast<FARPROC*>(&pFunc))))
         return -1;
 
     return pFunc();
@@ -1575,10 +1242,10 @@ HRESULT M2GetDpiForMonitor(
     if (SUCCEEDED(hr))
     {
         decltype(GetDpiForMonitor)* pFunc = nullptr;
-        hr = M2GetProcAddress(
-            reinterpret_cast<FARPROC*>(&pFunc),
+        hr = ::MileGetProcAddress(
             hModule,
-            "GetDpiForMonitor");
+            "GetDpiForMonitor",
+            reinterpret_cast<FARPROC*>(&pFunc));
         if (SUCCEEDED(hr))
         {
             hr = pFunc(hmonitor, dpiType, dpiX, dpiY);

@@ -13,7 +13,7 @@
 #ifndef _M2_WINDOWS_EXTENDED_HELPERS_
 #define _M2_WINDOWS_EXTENDED_HELPERS_
 
-#include "M2WindowsDownlevelHelpers.h"
+#include <Mile.Windows.h>
 
 /**
  * If the type T is a reference type, provides the member typedef type which is
@@ -236,7 +236,7 @@ namespace M2
 
         static inline void Close(TMemory Object)
         {
-            M2FreeMemory(Object);
+            ::MileFreeMemory(Object);
         }
     };
 
@@ -265,7 +265,7 @@ namespace M2
 
         static inline void Close(HKEY Object)
         {
-            M2RegCloseKey(Object);
+            ::MileRegCloseKey(Object);
         }
     };
 
@@ -287,7 +287,7 @@ namespace M2
 
         static inline void Close(PSID Object)
         {
-            FreeSid(Object);
+            ::MileFreeSid(Object);
         }
     };
 
@@ -322,15 +322,15 @@ namespace M2
                 return 0;
             };
 
-            M2CreateThread(
-                &this->m_Thread,
+            ::MileCreateThread(
                 nullptr,
                 0,
                 ThreadFunctionInternal,
                 reinterpret_cast<LPVOID>(
                     new TFunction(std::move(workerFunction))),
                 dwCreationFlags,
-                nullptr);
+                nullptr,
+                &this->m_Thread);
         }
 
         HANDLE Detach()
@@ -375,28 +375,28 @@ namespace M2
     public:
         CCriticalSection()
         {
-            InitializeCriticalSection(&this->m_CriticalSection);
+            ::MileInitializeCriticalSection(&this->m_CriticalSection);
         }
 
         ~CCriticalSection()
         {
-            DeleteCriticalSection(&this->m_CriticalSection);
+            ::MileDeleteCriticalSection(&this->m_CriticalSection);
         }
 
         _Acquires_lock_(m_CriticalSection) void Lock()
         {
-            EnterCriticalSection(&this->m_CriticalSection);
+            ::MileEnterCriticalSection(&this->m_CriticalSection);
         }
 
         _Releases_lock_(m_CriticalSection) void Unlock()
         {
-            LeaveCriticalSection(&this->m_CriticalSection);
+            ::MileLeaveCriticalSection(&this->m_CriticalSection);
         }
 
         _When_(return, _Acquires_exclusive_lock_(m_CriticalSection))
             bool TryLock()
         {
-            return TryEnterCriticalSection(&this->m_CriticalSection);
+            return ::MileTryEnterCriticalSection(&this->m_CriticalSection);
         }
     };
 
@@ -411,37 +411,37 @@ namespace M2
     public:
         CSRWLock()
         {
-            InitializeSRWLock(&this->m_SRWLock);
+            ::MileInitializeSRWLock(&this->m_SRWLock);
         }
 
         _Acquires_lock_(m_SRWLock) void ExclusiveLock()
         {
-            AcquireSRWLockExclusive(&this->m_SRWLock);
+            ::MileAcquireSRWLockExclusive(&this->m_SRWLock);
         }
 
         _Acquires_lock_(m_SRWLock) bool TryExclusiveLock()
         {
-            return TryAcquireSRWLockExclusive(&this->m_SRWLock);
+            return ::MileTryAcquireSRWLockExclusive(&this->m_SRWLock);
         }
 
         _Releases_lock_(m_SRWLock) void ExclusiveUnlock()
         {
-            ReleaseSRWLockExclusive(&this->m_SRWLock);
+            ::MileReleaseSRWLockExclusive(&this->m_SRWLock);
         }
 
         _Acquires_lock_(m_SRWLock) void SharedLock()
         {
-            AcquireSRWLockShared(&this->m_SRWLock);
+            ::MileAcquireSRWLockShared(&this->m_SRWLock);
         }
 
         _Acquires_lock_(m_SRWLock) bool TrySharedLock()
         {
-            return TryAcquireSRWLockShared(&this->m_SRWLock);
+            return ::MileTryAcquireSRWLockShared(&this->m_SRWLock);
         }
 
         _Releases_lock_(m_SRWLock) void SharedUnlock()
         {
-            ReleaseSRWLockShared(&this->m_SRWLock);
+            ::MileReleaseSRWLockShared(&this->m_SRWLock);
         }
     };
 
@@ -649,194 +649,63 @@ namespace M2
 #define _M2_WINDOWS_BASE_EXTENDED_HELPERS_
 
 /**
- * Retrieves file system attributes for a specified file or directory.
+ * Retrieves the calling thread's last-error code value. The last-error code is
+ * maintained on a per-thread basis. Multiple threads do not overwrite each
+ * other's last-error code.
  *
- * @param FileHandle A handle to the file that contains the information to be
- *                   retrieved. This handle should not be a pipe handle.
- * @param FileAttributes The attributes of the specified file or directory.
- *                       For a list of attribute values and their descriptions,
- *                       see File Attribute Constants. If the function fails,
- *                       the return value is INVALID_FILE_ATTRIBUTES.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @param IsLastFunctionCallSucceeded Set this parameter TRUE if you can be
+ *                                    sure that the last call was succeeded.
+ *                                    Otherwise, set this parameter FALSE.
+ * @param UseLastErrorWhenSucceeded Set this parameter TRUE if you want to use
+ *                                  last-error code if the last call was
+ *                                  succeeded. Otherwise, set this parameter
+ *                                  FALSE.
+ * @return The calling thread's last-error code.
  */
-HRESULT M2GetFileAttributes(
-    _In_ HANDLE FileHandle,
-    _Out_ PDWORD FileAttributes);
+DWORD M2GetLastWin32Error(
+    _In_ BOOL IsLastFunctionCallSucceeded = FALSE,
+    _In_ BOOL UseLastErrorWhenSucceeded = FALSE);
 
 /**
- * Sets the attributes for a file or directory.
+ * Retrieves the calling thread's last-error code value. The last-error code is
+ * maintained on a per-thread basis. Multiple threads do not overwrite each
+ * other's last-error code.
  *
- * @param FileHandle A handle to the file for which to change information. This
- *                   handle must be opened with the appropriate permissions for
- *                   the requested change. This handle should not be a pipe
- *                   handle.
- * @param FileAttributes The file attributes to set for the file. This
- *                       parameter can be one or more values, combined using
- *                       the bitwise - OR operator. However, all other values
- *                       override FILE_ATTRIBUTE_NORMAL. For more information,
- *                       see the SetFileAttributes function.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @param KnownFailed Set this parameter TRUE if you can be sure that the last
+ *                    call was failed, Otherwise, set this parameter FALSE.
+ * @param LastErrorCode A pointer to a variable that returns the calling
+ *                      thread's last-error code. This parameter can be NULL.
+ * @return The calling thread's last-error code which is converted to an
+ *         HRESULT value.
  */
-HRESULT M2SetFileAttributes(
-    _In_ HANDLE FileHandle,
-    _In_ DWORD FileAttributes);
+HRESULT M2GetLastHResultError(
+    _In_ BOOL IsLastFunctionCallSucceeded = FALSE,
+    _In_ BOOL UseLastErrorWhenSucceeded = FALSE);
 
 /**
- * Retrieves the size of the specified file.
+ * Creates a single uninitialized object of the class associated with a
+ * specified CLSID.
  *
- * @param FileHandle A handle to the file that contains the information to be
- *                   retrieved. This handle should not be a pipe handle.
- * @param FileSize A pointer to a ULONGLONG value that receives the file size,
- *                 in bytes.
+ * @param lpszCLSID The string representation of the CLSID.
+ * @param pUnkOuter If NULL, indicates that the object is not being created as
+ *                  part of an aggregate. If non-NULL, pointer to the aggregate
+ *                  object's IUnknown interface (the controlling IUnknown).
+ * @param dwClsContext Context in which the code that manages the newly created
+ *                     object will run. The values are taken from the
+ *                     enumeration CLSCTX.
+ * @param lpszIID A pointer to the string representation of the IID.
+ * @param ppv Address of pointer variable that receives the interface pointer
+ *            requested in riid. Upon successful return, *ppv contains the
+ *            requested interface pointer. Upon failure, *ppv contains NULL.
  * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             GENERIC_READ | SYNCHRONIZE,
- *             FILE_SHARE_READ,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
+ * @remark For more information, see CoCreateInstance.
  */
-HRESULT M2GetFileSize(
-    _In_ HANDLE FileHandle,
-    _Out_ PULONGLONG FileSize);
-
-/**
- * Retrieves the amount of space that is allocated for the file.
- *
- * @param FileHandle A handle to the file that contains the information to be
- *                   retrieved. This handle should not be a pipe handle.
- * @param AllocationSize A pointer to a ULONGLONG value that receives the
- *                       amount of space that is allocated for the file, in
- *                       bytes.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             GENERIC_READ | SYNCHRONIZE,
- *             FILE_SHARE_READ,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2GetFileAllocationSize(
-    _In_ HANDLE FileHandle,
-    _Out_ PULONGLONG AllocationSize);
-
-/**
- * Deletes an existing file.
- *
- * @param FileHandle The handle of the file to be deleted. This handle must be
- *                   opened with the appropriate permissions for the requested
- *                   change. This handle should not be a pipe handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             SYNCHRONIZE | DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
- *             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2DeleteFile(
-    _In_ HANDLE FileHandle);
-
-/**
- * Deletes an existing file, even the file have the readonly attribute.
- *
- * @param FileHandle The handle of the file to be deleted. This handle must be
- *                   opened with the appropriate permissions for the requested
- *                   change. This handle should not be a pipe handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             SYNCHRONIZE | DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
- *             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2DeleteFileIgnoreReadonlyAttribute(
-    _In_ HANDLE FileHandle);
-
-/**
- * The definition of the file enumerator handle.
- */
-typedef void* M2_FILE_ENUMERATOR_HANDLE;
-typedef M2_FILE_ENUMERATOR_HANDLE* PM2_FILE_ENUMERATOR_HANDLE;
-
-/**
- * The information about a found file or directory queried from the file
- * enumerator.
- */
-typedef struct _M2_FILE_ENUMERATOR_INFORMATION
-{
-    FILETIME CreationTime;
-    FILETIME LastAccessTime;
-    FILETIME LastWriteTime;
-    FILETIME ChangeTime;
-    LARGE_INTEGER FileSize;
-    LARGE_INTEGER AllocationSize;
-    DWORD FileAttributes;
-    DWORD EaSize;
-    LARGE_INTEGER FileId;
-    WCHAR ShortName[16];
-    WCHAR FileName[256];
-} M2_FILE_ENUMERATOR_INFORMATION, * PM2_FILE_ENUMERATOR_INFORMATION;
-
-/**
- * Creates a file enumerator handle for searching a directory for a file or
- * subdirectory with a name.
- *
- * @param FileEnumeratorHandle The file enumerator handle.
- * @param FileHandle The handle of the file to be searched a directory for a
- *                   file or subdirectory with a name. This handle must be
- *                   opened with the appropriate permissions for the requested
- *                   change. This handle should not be a pipe handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark The way to get a file handle for this operation:
- *         HANDLE hFile = CreateFileW(
- *             lpFileName,
- *             FILE_LIST_DIRECTORY | SYNCHRONIZE,
- *             FILE_SHARE_READ | FILE_SHARE_WRITE,
- *             nullptr,
- *             OPEN_EXISTING,
- *             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
- *             nullptr);
- */
-HRESULT M2CreateFileEnumerator(
-    _Out_ PM2_FILE_ENUMERATOR_HANDLE FileEnumeratorHandle,
-    _In_ HANDLE FileHandle);
-
-/**
- * Closes a created file enumerator handle.
- *
- * @param FileEnumeratorHandle The created file enumerator handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2CloseFileEnumerator(
-    _In_ M2_FILE_ENUMERATOR_HANDLE FileEnumeratorHandle);
-
-/**
- * Starts or continues a file search from a created file enumerator handle.
- *
- * @param FileEnumeratorInformation A pointer to the
- *                                  M2_FILE_ENUMERATOR_INFORMATION structure
- *                                  that receives information about a found
- *                                  file or directory.
- * @param FileEnumeratorHandle The created file enumerator handle.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2QueryFileEnumerator(
-    _Out_ PM2_FILE_ENUMERATOR_INFORMATION FileEnumeratorInformation,
-    _In_ M2_FILE_ENUMERATOR_HANDLE FileEnumeratorHandle);
+HRESULT M2CoCreateInstance(
+    _In_ LPCWSTR lpszCLSID,
+    _In_opt_ LPUNKNOWN pUnkOuter,
+    _In_ DWORD dwClsContext,
+    _In_ LPCWSTR lpszIID,
+    _Out_ LPVOID* ppv);
 
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 
@@ -883,7 +752,7 @@ inline HRESULT M2GetProcAddress(
     _In_ LPCSTR lpProcName)
 {
     return M2GetProcAddress(
-        reinterpret_cast<FARPROC*>(&lpProcAddress), hModule, lpProcName);
+        hModule, lpProcName, reinterpret_cast<FARPROC*>(&lpProcAddress));
 }
 
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)

@@ -6,16 +6,20 @@
 
 ### Prototype
 
-NSudo is based on SuperCMD by Raymai97. Visit
+NSudo Launcher is based on SuperCMD by Raymai97. Visit
 [here](http://bbs.pcbeta.com/viewthread-1508863-1-1.html "here") for more
 information about SuperCMD.
 
-### Feature List
+NSudo Devil Mode is based on the Dism++ God Mode, with new features and several
+improvements.
 
-- Distributed under the MIT License. (More freedom than GNU GPL.)
+### Features
+
+- Distributed under the MIT License. (More freedom than the GNU GPL.)
 - Provide the x86, x86-64, ARM, ARM64 binaries.
-- Support Windows Vista and lator.
-- Compact binary size with VC-LTL and libkcrt from Chuyu Team.
+- Support Windows Vista and later.
+- Using VC-LTL and libkcrt from Chuyu Team for smaller binary size.
+- Using C++17, but only use core language features in the most cases.
 - NSudo Launcher
   - Launch programs with TrustedInstaller access token.
   - Launch programs with System access token.
@@ -57,10 +61,23 @@ information about SuperCMD.
   - High performance.
     - Note: Because it don't need to create the windows service and the windows
       service process.
+  - Provide C APIs and .Net Core bindings for developers.
 - NSudo Devil Mode
-  - One of elegant solutions for developers who want to bypass the file and 
+  - The most elegant solution for developers who want to bypass the file and 
     registry access checks for the process with the Administrator privilege.
-  - Only depend on ntdll.dll.
+  - Hook APIs via the Microsoft Detours library for the maximum compatibility.
+  - The binary only depend on the exported named APIs from ntdll.dll.
+
+### Third-party projects which uses NSudo
+
+- MSMG ToolKit
+- Sledgehammer (WUMT Wrapper Script)
+- Dism++
+
+### System requirements
+
+- Supported OS Version: Windows NT 6.0 or later
+- Supported CPU Architecture: x86, x86-64(AMD64), ARM, ARM64
 
 ### Third-party introduction
 
@@ -69,15 +86,10 @@ information about SuperCMD.
 - TrishTech.com: [https://www.trishtech.com/2018/11/nsudo-run-programs-with-full-privileges-in-windows/](https://www.trishtech.com/2018/11/nsudo-run-programs-with-full-privileges-in-windows/)
 - Wilders Security Forums: [https://www.wilderssecurity.com/threads/396818](https://www.wilderssecurity.com/threads/396818)
 
-### System requirements
-
-- Supported OS Version: Windows NT 6.0 or later
-- Supported CPU Architecture: x86, x86-64(AMD64), ARM, ARM64
-
 ## Usage
 
-### Quick Start
+### Quick Start for NSudo Launcher
 
-Please go to the [CPU Architecture] folder and click NSudo.exe. Follow the
+Please go to the [CPU Architecture] folder and click NSudoLG.exe. Follow the
 prompts. For example, if you want to use 64-bit NSudo on your Intel or AMD
-device, you need to go to the x64 folder and click NSudoG.exe
+device, you need to go to the x64 folder and click NSudoLG.exe
