@@ -371,79 +371,93 @@ public:
     {
         ShortCutList.clear();
 
-        HANDLE FileHandle = ::CreateFileW(
+        HRESULT hr = S_OK;
+        HANDLE FileHandle = INVALID_HANDLE_VALUE;
+
+        hr = ::MileCreateFile(
             ShortCutListPath.c_str(),
             GENERIC_READ,
             FILE_SHARE_READ,
             nullptr,
             OPEN_EXISTING,
             FILE_FLAG_SEQUENTIAL_SCAN,
-            nullptr);
-        if (FileHandle != INVALID_HANDLE_VALUE)
+            nullptr,
+            &FileHandle);
+        if (hr == S_OK)
         {
-            DWORD FileSize = ::GetFileSize(FileHandle, nullptr);
+            UINT64 FileSize = 0;
 
-            HANDLE FileMapping = CreateFileMappingW(
-                FileHandle, nullptr, PAGE_WRITECOPY, 0, 0, nullptr);
-            if (FileMapping)
+            hr = ::MileGetFileSize(FileHandle, &FileSize);
+            if (hr == S_OK)
             {
-                const char* MapAddress = reinterpret_cast<const char*>(
-                    MapViewOfFile(FileMapping, FILE_MAP_COPY, 0, 0, FileSize));
-                if (MapAddress)
+                char* FileContent = nullptr;
+
+                hr = ::MileAllocMemory(
+                    static_cast<SIZE_T>(FileSize),
+                    reinterpret_cast<LPVOID*>(&FileContent));
+                if (hr == S_OK)
                 {
-                    const char* JsonString = MapAddress + 3;
-                    std::size_t JsonStringLength = FileSize - 3;
-
-                    jsmntok_t* JsonTokens = nullptr;
-                    std::int32_t JsonTokensCount = 0;
-                    if (JsmnParseJson(
-                        &JsonTokens,
-                        &JsonTokensCount,
-                        JsonString,
-                        JsonStringLength))
+                    DWORD NumberOfBytesRead = 0;
+                    hr = ::MileReadFile(
+                        FileHandle,
+                        FileContent,
+                        static_cast<DWORD>(FileSize),
+                        &NumberOfBytesRead,
+                        nullptr);
+                    if (hr == S_OK)
                     {
-                        for (size_t i = 0; i < static_cast<size_t>(JsonTokensCount); ++i)
+                        const char* JsonString = FileContent + 3;
+                        std::size_t JsonStringLength = NumberOfBytesRead - 3;
+
+                        jsmntok_t* JsonTokens = nullptr;
+                        std::int32_t JsonTokensCount = 0;
+                        if (JsmnParseJson(
+                            &JsonTokens,
+                            &JsonTokensCount,
+                            JsonString,
+                            JsonStringLength))
                         {
-                            if (JsmnJsonEqual(
-                                JsonString,
-                                &JsonTokens[i],
-                                "ShortCutList_V2"))
+                            for (size_t i = 0; i < static_cast<size_t>(JsonTokensCount); ++i)
                             {
-                                if (JsonTokens[i + 1].type != JSMN_OBJECT)
+                                if (JsmnJsonEqual(
+                                    JsonString,
+                                    &JsonTokens[i],
+                                    "ShortCutList_V2"))
                                 {
-                                    continue;
-                                }
-
-                                for (size_t j = 0; j < static_cast<size_t>(JsonTokens[i + 1].size); ++j)
-                                {
-                                    jsmntok_t& Key = JsonTokens[i + (j * 2) + 2];
-                                    jsmntok_t& Value = JsonTokens[i + (j * 2) + 3];
-
-                                    if (Key.type != JSMN_STRING ||
-                                        Value.type != JSMN_STRING)
+                                    if (JsonTokens[i + 1].type != JSMN_OBJECT)
                                     {
                                         continue;
                                     }
 
-                                    ShortCutList.emplace(std::make_pair(
-                                        M2MakeUTF16String(std::string(
-                                            JsonString + Key.start,
-                                            Key.end - Key.start)),
-                                        M2MakeUTF16String(std::string(
-                                            JsonString + Value.start,
-                                            Value.end - Value.start))));
-                                }
-                                i += JsonTokens[i + 1].size + 1;
-                            }
-                        }
+                                    for (size_t j = 0; j < static_cast<size_t>(JsonTokens[i + 1].size); ++j)
+                                    {
+                                        jsmntok_t& Key = JsonTokens[i + (j * 2) + 2];
+                                        jsmntok_t& Value = JsonTokens[i + (j * 2) + 3];
 
-                        ::free(JsonTokens);
+                                        if (Key.type != JSMN_STRING ||
+                                            Value.type != JSMN_STRING)
+                                        {
+                                            continue;
+                                        }
+
+                                        ShortCutList.emplace(std::make_pair(
+                                            M2MakeUTF16String(std::string(
+                                                JsonString + Key.start,
+                                                Key.end - Key.start)),
+                                            M2MakeUTF16String(std::string(
+                                                JsonString + Value.start,
+                                                Value.end - Value.start))));
+                                    }
+                                    i += JsonTokens[i + 1].size + 1;
+                                }
+                            }
+
+                            ::free(JsonTokens);
+                        }
                     }
 
-                    ::UnmapViewOfFile(MapAddress);
+                    ::MileFreeMemory(FileContent);
                 }
-
-                ::MileCloseHandle(FileMapping);
             }
 
             ::MileCloseHandle(FileHandle);
@@ -923,7 +937,7 @@ private:
 
         HRESULT hr = E_FAIL;
 
-        hr = M2GetDpiForMonitor(
+        hr = ::MileGetDpiForMonitor(
             MonitorFromWindow(this->m_hWnd, MONITOR_DEFAULTTONEAREST),
             MDT_EFFECTIVE_DPI, (UINT*)&this->m_xDPI, (UINT*)&this->m_yDPI);
         if (hr != S_OK)

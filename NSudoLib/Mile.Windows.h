@@ -13,6 +13,10 @@
 
 #include <Windows.h>
 
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+#include <ShellScalingApi.h>
+#endif
+
 /**
  * Retrieves a handle to the default heap of the calling process. This handle
  * can then be used in subsequent calls to the heap functions.
@@ -1714,8 +1718,6 @@ EXTERN_C HRESULT WINAPI MileGetProcAddress(
  * various types of I/O depending on the file or device and the flags and
  * attributes specified.
  *
- * @param lpFileHandle The address of the returned handle to the specified
- *                     file.
  * @param lpFileName The name of the file or device to be created or opened.
  *                   You may use either forward slashes (/) or backslashes ()
  *                   in this name.
@@ -1741,18 +1743,20 @@ EXTERN_C HRESULT WINAPI MileGetProcAddress(
  *                      access right. The template file supplies file
  *                      attributes and extended attributes for the file that is
  *                      being created. This parameter can be NULL.
+ * @param lpFileHandle The address of the returned handle to the specified
+ *                     file.
  * @return HRESULT. If the function succeeds, the return value is S_OK.
  * @remark For more information, see CreateFileW.
  */
 EXTERN_C HRESULT WINAPI MileCreateFile(
-    _Out_ PHANDLE lpFileHandle,
     _In_ LPCWSTR lpFileName,
     _In_ DWORD dwDesiredAccess,
     _In_ DWORD dwShareMode,
     _In_opt_ LPSECURITY_ATTRIBUTES lpSecurityAttributes,
     _In_ DWORD dwCreationDisposition,
     _In_ DWORD dwFlagsAndAttributes,
-    _In_opt_ HANDLE hTemplateFile);
+    _In_opt_ HANDLE hTemplateFile,
+    _Out_ PHANDLE lpFileHandle);
 
 #endif
 
@@ -2205,6 +2209,348 @@ EXTERN_C HRESULT WINAPI MileSetFileNtfsCompressionAttribute(
 EXTERN_C HRESULT WINAPI MileGetFileNtfsCompressionAttribute(
     _In_ HANDLE FileHandle,
     _Out_ PUSHORT CompressionAlgorithm);
+
+#endif
+
+/**
+ * Creates a single uninitialized object of the class associated with a
+ * specified CLSID.
+ *
+ * @param rclsid The CLSID associated with the data and code that will be used
+ *               to create the object.
+ * @param pUnkOuter If NULL, indicates that the object is not being created as
+ *                  part of an aggregate. If non-NULL, pointer to the aggregate
+ *                  object's IUnknown interface (the controlling IUnknown).
+ * @param dwClsContext Context in which the code that manages the newly created
+ *                     object will run. The values are taken from the
+ *                     enumeration CLSCTX.
+ * @param riid A reference to the identifier of the interface to be used to
+ *             communicate with the object.
+ * @param ppv Address of pointer variable that receives the interface pointer
+ *            requested in riid. Upon successful return, *ppv contains the
+ *            requested interface pointer. Upon failure, *ppv contains NULL.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see CoCreateInstance.
+ */
+EXTERN_C HRESULT WINAPI MileCoCreateInstance(
+    _In_ REFCLSID rclsid,
+    _In_opt_ LPUNKNOWN pUnkOuter,
+    _In_ DWORD dwClsContext,
+    _In_ REFIID riid,
+    _Out_ LPVOID* ppv);
+
+/**
+ * Converts the CLSID string to the CLSID structure.
+ *
+ * @param lpsz The string representation of the CLSID.
+ * @param pclsid A pointer to the CLSID.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see CLSIDFromString.
+ */
+EXTERN_C HRESULT WINAPI MileCLSIDFromString(
+    _In_ LPCOLESTR lpsz,
+    _Out_ LPCLSID pclsid);
+
+/**
+ * Converts the IID string to the IID structure.
+ *
+ * @param lpsz A pointer to the string representation of the IID.
+ * @param lpiid A pointer to the IID.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see IIDFromString.
+ */
+EXTERN_C HRESULT WINAPI MileIIDFromString(
+    _In_ LPCOLESTR lpsz,
+    _Out_ LPIID lpiid);
+
+/**
+ * Creates a single uninitialized object of the class associated with a
+ * specified CLSID.
+ *
+ * @param lpszCLSID The string representation of the CLSID.
+ * @param pUnkOuter If NULL, indicates that the object is not being created as
+ *                  part of an aggregate. If non-NULL, pointer to the aggregate
+ *                  object's IUnknown interface (the controlling IUnknown).
+ * @param dwClsContext Context in which the code that manages the newly created
+ *                     object will run. The values are taken from the
+ *                     enumeration CLSCTX.
+ * @param lpszIID The string representation of the IID.
+ * @param ppv Address of pointer variable that receives the interface pointer
+ *            requested in riid. Upon successful return, *ppv contains the
+ *            requested interface pointer. Upon failure, *ppv contains NULL.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see CoCreateInstance.
+ */
+EXTERN_C HRESULT WINAPI MileCoCreateInstanceByString(
+    _In_ LPCWSTR lpszCLSID,
+    _In_opt_ LPUNKNOWN pUnkOuter,
+    _In_ DWORD dwClsContext,
+    _In_ LPCWSTR lpszIID,
+    _Out_ LPVOID* ppv);
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+
+/**
+ * Retrieves the string type data for the specified value name associated with
+ * an open registry key.
+ *
+ * @param hKey A handle to an open registry key.
+ * @param lpValueName The name of the registry value.
+ * @param lpData A pointer to a buffer that receives the value's data. When you
+ *               have finished using the information, free it by calling the
+ *               MileFreeMemory function. You should also set the pointer to
+ *               NULL.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ */
+EXTERN_C HRESULT WINAPI MileRegQueryStringValue(
+    _In_ HKEY hKey,
+    _In_opt_ LPCWSTR lpValueName,
+    _Out_ LPWSTR* lpData);
+
+#endif
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+
+/**
+ * Determines whether the interface id have the correct interface name.
+ *
+ * @param InterfaceID A pointer to the string representation of the IID.
+ * @param InterfaceName A pointer to the interface name string.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ */
+EXTERN_C HRESULT WINAPI MileCoCheckInterfaceName(
+    _In_ LPCWSTR InterfaceID,
+    _In_ LPCWSTR InterfaceName);
+
+#endif
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+
+/**
+ * Queries the dots per inch (dpi) of a display.
+ *
+ * @param hmonitor Handle of the monitor being queried.
+ * @param dpiType The type of DPI being queried. Possible values are from the
+ *                MONITOR_DPI_TYPE enumeration.
+ * @param dpiX The value of the DPI along the X axis. This value always refers
+ *             to the horizontal edge, even when the screen is rotated.
+ * @param dpiY The value of the DPI along the Y axis. This value always refers
+ *             to the vertical edge, even when the screen is rotated.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see GetDpiForMonitor.
+ */
+EXTERN_C HRESULT WINAPI MileGetDpiForMonitor(
+    _In_ HMONITOR hmonitor,
+    _In_ MONITOR_DPI_TYPE dpiType,
+    _Out_ UINT* dpiX,
+    _Out_ UINT* dpiY);
+
+#endif
+
+/**
+ * Tests for the current directory and parent directory markers while iterating
+ * through files.
+ *
+ * @param Name The name of the file or directory for testing.
+ * @return Nonzero if the found file has the name "." or "..", which indicates
+ *         that the found file is actually a directory. Otherwise 0.
+ */
+EXTERN_C BOOL WINAPI MileIsDots(
+    _In_ LPCWSTR Name);
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+
+/**
+ * Creates or opens a named or unnamed file mapping object for a specified
+ * file.
+ *
+ * @param hFile A handle to the file from which to create a file mapping
+ *              object. If hFile is INVALID_HANDLE_VALUE, the calling process
+ *              must also specify a size for the file mapping object in the
+ *              dwMaximumSizeHigh and dwMaximumSizeLow parameters.
+ * @param lpFileMappingAttributes A pointer to a SECURITY_ATTRIBUTES structure
+ *                                that determines whether a returned handle can
+ *                                be inherited by child processes. If
+ *                                lpFileMappingAttributes is NULL, the handle
+ *                                cannot be inherited and the file mapping
+ *                                object gets a default security descriptor.
+ * @param flProtect Specifies the page protection of the file mapping object.
+ *                  All mapped views of the object must be compatible with this
+ *                  protection.
+ * @param dwMaximumSizeHigh The high-order DWORD of the maximum size of the
+ *                          file mapping object.
+ * @param dwMaximumSizeLow The low-order DWORD of the maximum size of the file
+ *                         mapping object. If this parameter and
+ *                         dwMaximumSizeHigh are 0 (zero), the maximum size of
+ *                         the file mapping object is equal to the current size
+ *                         of the file that hFile identifies.
+ * @param lpName The name of the file mapping object. If this parameter matches
+ *               the name of an existing mapping object, the function requests
+ *               access to the object with the protection that flProtect
+ *               specifies. If this parameter is NULL, the file mapping object
+ *               is created without a name.
+ * @param lpFileMappingHandle The address of the returned handle to the newly
+ *                            created file mapping object.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see CreateFileMappingW.
+ */
+EXTERN_C HRESULT WINAPI MileCreateFileMapping(
+    _In_ HANDLE hFile,
+    _In_opt_ LPSECURITY_ATTRIBUTES lpFileMappingAttributes,
+    _In_ DWORD flProtect,
+    _In_ DWORD dwMaximumSizeHigh,
+    _In_ DWORD dwMaximumSizeLow,
+    _In_opt_ LPCWSTR lpName,
+    _Out_ PHANDLE lpFileMappingHandle);
+
+#endif
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+
+/**
+ * Maps a view of a file mapping into the address space of a calling process.
+ *
+ * @param hFileMappingObject A handle to a file mapping object.
+ * @param dwDesiredAccess The type of access to a file mapping object, which
+ *                        determines the page protection of the pages.
+ * @param dwFileOffsetHigh A high-order DWORD of the file offset where the view
+ *                         begins.
+ * @param dwFileOffsetLow A low-order DWORD of the file offset where the view
+ *                        is to begin. The combination of the high and low
+ *                        offsets must specify an offset within the file
+ *                        mapping.
+ * @param dwNumberOfBytesToMap The number of bytes of a file mapping to map to
+ *                             the view. All bytes must be within the maximum
+ *                             size specified by MileCreateFileMapping. If this
+ *                             parameter is 0 (zero), the mapping extends from
+ *                             the specified offset to the end of the file
+ *                             mapping.
+ * @param lpBaseAddress The address of the starting address of the mapped view.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see MapViewOfFile.
+ */
+EXTERN_C HRESULT WINAPI MileMapViewOfFile(
+    _In_ HANDLE hFileMappingObject,
+    _In_ DWORD dwDesiredAccess,
+    _In_ DWORD dwFileOffsetHigh,
+    _In_ DWORD dwFileOffsetLow,
+    _In_ SIZE_T dwNumberOfBytesToMap,
+    _Out_ LPVOID* lpBaseAddress);
+
+#endif
+
+/**
+ * Unmaps a mapped view of a file from the calling process's address space.
+ *
+ * @param lpBaseAddress A pointer to the base address of the mapped view of a
+ *                      file that is to be unmapped.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see UnmapViewOfFile.
+ */
+EXTERN_C HRESULT WINAPI MileUnmapViewOfFile(
+    _In_ LPCVOID lpBaseAddress);
+
+/**
+ * Reads data from the specified file or input/output (I/O) device. Reads occur
+ * at the position specified by the file pointer if supported by the device.
+ *
+ * @param hFile A handle to the device (for example, a file, file stream,
+ *              physical disk, volume, console buffer, tape drive, socket,
+ *              communications resource, mailslot, or pipe).
+ * @param lpBuffer A pointer to the buffer that receives the data read from a
+ *                 file or device. This buffer must remain valid for the
+ *                 duration of the read operation. The caller must not use this
+ *                 buffer until the read operation is completed.
+ * @param nNumberOfBytesToRead The maximum number of bytes to be read.
+ * @param lpNumberOfBytesRead A pointer to the variable that receives the
+ *                            number of bytes read when using a synchronous
+ *                            hFile parameter. MileReadFile sets this value to
+ *                            zero before doing any work or error checking. Use
+ *                            NULL for this parameter if this is an
+ *                            asynchronous operation to avoid potentially
+ *                            erroneous results. This parameter can be NULL
+ *                            only when the lpOverlapped parameter is not NULL.
+ * @param lpOverlapped A pointer to an OVERLAPPED structure is required if the
+ *                     hFile parameter was opened with FILE_FLAG_OVERLAPPED,
+ *                     otherwise it can be NULL.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see ReadFile.
+ */
+EXTERN_C HRESULT WINAPI MileReadFile(
+    _In_ HANDLE hFile,
+    _Out_opt_ LPVOID lpBuffer,
+    _In_ DWORD nNumberOfBytesToRead,
+    _Out_opt_ LPDWORD lpNumberOfBytesRead,
+    _Inout_opt_ LPOVERLAPPED lpOverlapped);
+
+/**
+ * Writes data to the specified file or input/output (I/O) device.
+ *
+ * @param hFile A handle to the device (for example, a file, file stream,
+ *              physical disk, volume, console buffer, tape drive, socket,
+ *              communications resource, mailslot, or pipe).
+ * @param lpBuffer A pointer to the buffer containing the data to be written to
+ *                 the file or device. This buffer must remain valid for the
+ *                 duration of the write operation. The caller must not use
+ *                 this buffer until the write operation is completed.
+ * @param nNumberOfBytesToWrite The number of bytes to be written to the file
+ *                              or device. A value of zero specifies a null
+ *                              write operation. The behavior of a null write
+ *                              operation depends on the underlying file system
+ *                              or communications technology.
+ * @param lpNumberOfBytesWritten A pointer to the variable that receives the
+ *                               number of bytes written when using a
+ *                               synchronous hFile parameter. MileWriteFile
+ *                               sets this value to zero before doing any work
+ *                               or error checking. Use NULL for this parameter
+ *                               if this is an asynchronous operation to avoid
+ *                               potentially erroneous results. This parameter
+ *                               can be NULL only when the lpOverlapped
+ *                               parameter is not NULL.
+ * @param lpOverlapped A pointer to an OVERLAPPED structure is required if the
+ *                     hFile parameter was opened with FILE_FLAG_OVERLAPPED,
+ *                     otherwise this parameter can be NULL.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see WriteFile.
+ */
+EXTERN_C HRESULT WINAPI MileWriteFile(
+    _In_ HANDLE hFile,
+    _In_opt_ LPCVOID lpBuffer,
+    _In_ DWORD nNumberOfBytesToWrite,
+    _Out_opt_ LPDWORD lpNumberOfBytesWritten,
+    _Inout_opt_ LPOVERLAPPED lpOverlapped);
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+
+/**
+ * Creates or opens a file or I/O device. The most commonly used I/O devices
+ * are as follows: file, file stream, directory, physical disk, volume, console
+ * buffer, tape drive, communications resource, mailslot, and pipe. The
+ * function returns a handle that can be used to access the file or device for
+ * various types of I/O depending on the file or device and the flags and
+ * attributes specified.
+ *
+ * @param hOriginalFile A handle to the object to be reopened. The object must
+ *                      have been created by the MileCreateFile function.
+ * @param dwDesiredAccess The requested access to the file or device, which can
+ *                        be summarized as read, write, both or neither zero).
+ * @param dwShareMode The requested sharing mode of the file or device, which
+ *                    can be read, write, both, delete, all of these, or none
+ *                    (refer to the following table). Access requests to
+ *                    attributes or extended attributes are not affected by
+ *                    this flag.
+ * @param dwFlagsAndAttributes The file or device attributes and flags.
+ * @param lpFileHandle The address of the returned handle to the specified
+ *                     file.
+ * @return HRESULT. If the function succeeds, the return value is S_OK.
+ * @remark For more information, see ReOpenFile.
+ */
+EXTERN_C HRESULT WINAPI MileReOpenFile(
+    _In_ HANDLE hOriginalFile,
+    _In_ DWORD dwDesiredAccess,
+    _In_ DWORD dwShareMode,
+    _In_ DWORD dwFlagsAndAttributes,
+    _Out_ PHANDLE lpFileHandle);
 
 #endif
 
