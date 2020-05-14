@@ -1,4 +1,4 @@
-﻿# NSudo - 一個強大的系統管理工具
+﻿# NSudo - 系統管理工具包
 
 ![螢幕擷取畫面](./Screenshot.png)
 

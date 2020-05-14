@@ -1,4 +1,4 @@
-﻿# NSudo - A Powerful System Administration Tool
+﻿# NSudo | System Administration Toolkit
 
 ![Screenshot](./Screenshot.png)
 
