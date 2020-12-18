@@ -14,6 +14,8 @@
 
 #include "Mile.Windows.h"
 
+#include "Mile.Platform.Windows.h"
+
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 #include <WtsApi32.h>
 #pragma comment(lib, "WtsApi32.lib")
@@ -95,59 +97,12 @@ EXTERN_C HRESULT WINAPI MileGetLastErrorWithWin32BoolAsHResult(
 /**
  * @remark You can read the definition for this function in "Mile.Windows.h".
  */
-EXTERN_C HANDLE WINAPI MileGetProcessHeap()
-{
-    return ::GetProcessHeap();
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileHeapAlloc(
-    _In_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ SIZE_T dwBytes,
-    _Out_ LPVOID* lpNewMem)
-{
-    *lpNewMem = ::HeapAlloc(hHeap, dwFlags, dwBytes);
-    return *lpNewMem ? S_OK : ::MileHResultFromWin32(ERROR_NOT_ENOUGH_MEMORY);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileHeapReAlloc(
-    _Inout_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ LPVOID lpMem,
-    _In_ SIZE_T dwBytes,
-    _Out_ LPVOID* lpNewMem)
-{
-    *lpNewMem = ::HeapReAlloc(hHeap, dwFlags, lpMem, dwBytes);
-    return *lpNewMem ? S_OK : ::MileHResultFromWin32(ERROR_NOT_ENOUGH_MEMORY);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileHeapFree(
-    _Inout_ HANDLE hHeap,
-    _In_ DWORD dwFlags,
-    _In_ LPVOID lpMem)
-{
-    return ::MileGetLastErrorWithWin32BoolAsHResult(
-        ::HeapFree(hHeap, dwFlags, lpMem));
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
 EXTERN_C HRESULT WINAPI MileAllocMemory(
     _In_ SIZE_T Size,
     _Out_ LPVOID* Block)
 {
-    return ::MileHeapAlloc(
-        ::MileGetProcessHeap(), HEAP_ZERO_MEMORY, Size, Block);
+    *Block = Mile::HeapMemory::Allocate(Size);
+    return *Block ? S_OK : ::MileHResultFromWin32(ERROR_NOT_ENOUGH_MEMORY);
 }
 
 /**
@@ -158,8 +113,8 @@ EXTERN_C HRESULT WINAPI MileReAllocMemory(
     _In_ SIZE_T NewSize,
     _Out_ LPVOID* NewBlock)
 {
-    return ::MileHeapReAlloc(
-        ::MileGetProcessHeap(), HEAP_ZERO_MEMORY, OldBlock, NewSize, NewBlock);
+    *NewBlock = Mile::HeapMemory::Reallocate(OldBlock, NewSize);
+    return *NewBlock ? S_OK : ::MileHResultFromWin32(ERROR_NOT_ENOUGH_MEMORY);
 }
 
 /**
@@ -168,8 +123,8 @@ EXTERN_C HRESULT WINAPI MileReAllocMemory(
 EXTERN_C HRESULT WINAPI MileFreeMemory(
     _In_ LPVOID Block)
 {
-    return ::MileHeapFree(
-        ::MileGetProcessHeap(), 0, Block);
+    return ::MileGetLastErrorWithWin32BoolAsHResult(
+        Mile::HeapMemory::Free(Block));
 }
 
 /**
@@ -1917,114 +1872,6 @@ EXTERN_C HRESULT WINAPI MileCreateFile(
 }
 
 #endif
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileInitializeCriticalSection(
-    _Out_ LPCRITICAL_SECTION lpCriticalSection)
-{
-    ::InitializeCriticalSection(lpCriticalSection);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileDeleteCriticalSection(
-    _Inout_ LPCRITICAL_SECTION lpCriticalSection)
-{
-    ::DeleteCriticalSection(lpCriticalSection);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileEnterCriticalSection(
-    _Inout_ LPCRITICAL_SECTION lpCriticalSection)
-{
-    ::EnterCriticalSection(lpCriticalSection);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileLeaveCriticalSection(
-    _Inout_ LPCRITICAL_SECTION lpCriticalSection)
-{
-    ::LeaveCriticalSection(lpCriticalSection);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C BOOL WINAPI MileTryEnterCriticalSection(
-    _Inout_ LPCRITICAL_SECTION lpCriticalSection)
-{
-    return ::TryEnterCriticalSection(lpCriticalSection);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileInitializeSRWLock(
-    _Out_ PSRWLOCK SRWLock)
-{
-    ::InitializeSRWLock(SRWLock);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileAcquireSRWLockExclusive(
-    _Inout_ PSRWLOCK SRWLock)
-{
-    ::AcquireSRWLockExclusive(SRWLock);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C BOOL WINAPI MileTryAcquireSRWLockExclusive(
-    _Inout_ PSRWLOCK SRWLock)
-{
-    return ::TryAcquireSRWLockExclusive(SRWLock);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileReleaseSRWLockExclusive(
-    _Inout_ PSRWLOCK SRWLock)
-{
-    ::ReleaseSRWLockExclusive(SRWLock);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileAcquireSRWLockShared(
-    _Inout_ PSRWLOCK SRWLock)
-{
-    ::AcquireSRWLockShared(SRWLock);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C BOOL WINAPI MileTryAcquireSRWLockShared(
-    _Inout_ PSRWLOCK SRWLock)
-{
-    return ::TryAcquireSRWLockShared(SRWLock);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C VOID WINAPI MileReleaseSRWLockShared(
-    _Inout_ PSRWLOCK SRWLock)
-{
-    ::ReleaseSRWLockShared(SRWLock);
-}
 
 /**
  * @remark You can read the definition for this function in "Mile.Windows.h".

@@ -13,6 +13,7 @@
 #ifndef _M2_WINDOWS_EXTENDED_HELPERS_
 #define _M2_WINDOWS_EXTENDED_HELPERS_
 
+#include <Mile.Platform.Windows.h>
 #include <Mile.Windows.h>
 
 #include <utility>
@@ -31,42 +32,12 @@ template<class T> struct M2RemoveReference<T^> { typedef T Type; };
 namespace M2
 {
     /**
-     * Disable C++ Object Copying
-     */
-    class CDisableObjectCopying
-    {
-    protected:
-        CDisableObjectCopying() = default;
-        ~CDisableObjectCopying() = default;
-
-    private:
-        CDisableObjectCopying(
-            const CDisableObjectCopying&) = delete;
-        CDisableObjectCopying& operator=(
-            const CDisableObjectCopying&) = delete;
-    };
-
-    /**
-     * Disable C++ Object Moving
-     */
-    class CDisableObjectMoving
-    {
-    protected:
-        CDisableObjectMoving() = default;
-        ~CDisableObjectMoving() = default;
-
-    private:
-        CDisableObjectMoving(
-            const CDisableObjectCopying&&) = delete;
-        CDisableObjectMoving& operator=(
-            const CDisableObjectCopying&&) = delete;
-    };
-
-    /**
      * The implementation of smart object.
      */
     template<typename TObject, typename TObjectDefiner>
-    class CObject : CDisableObjectCopying, CDisableObjectMoving
+    class CObject :
+        Mile::DisableCopyConstruction,
+        Mile::DisableMoveConstruction
     {
     protected:
         TObject m_Object;
@@ -367,137 +338,42 @@ namespace M2
     };
 
     /**
-     * Wraps a critical section.
-     */
-    class CCriticalSection
-    {
-    private:
-        CRITICAL_SECTION m_CriticalSection;
-
-    public:
-        CCriticalSection()
-        {
-            ::MileInitializeCriticalSection(&this->m_CriticalSection);
-        }
-
-        ~CCriticalSection()
-        {
-            ::MileDeleteCriticalSection(&this->m_CriticalSection);
-        }
-
-        _Acquires_lock_(m_CriticalSection) void Lock()
-        {
-            ::MileEnterCriticalSection(&this->m_CriticalSection);
-        }
-
-        _Releases_lock_(m_CriticalSection) void Unlock()
-        {
-            ::MileLeaveCriticalSection(&this->m_CriticalSection);
-        }
-
-        _When_(return, _Acquires_exclusive_lock_(m_CriticalSection))
-            bool TryLock()
-        {
-            return ::MileTryEnterCriticalSection(&this->m_CriticalSection);
-        }
-    };
-
-    /**
      * Wraps a slim reader/writer (SRW) lock.
      */
     class CSRWLock
     {
     private:
-        SRWLOCK m_SRWLock;
+        Mile::SRWLock m_Object;
 
     public:
-        CSRWLock()
+        void ExclusiveLock()
         {
-            ::MileInitializeSRWLock(&this->m_SRWLock);
+            this->m_Object.LockExclusive();
         }
 
-        _Acquires_lock_(m_SRWLock) void ExclusiveLock()
+        bool TryExclusiveLock()
         {
-            ::MileAcquireSRWLockExclusive(&this->m_SRWLock);
+            return this->m_Object.TryLockExclusive();
         }
 
-        _Acquires_lock_(m_SRWLock) bool TryExclusiveLock()
+        void ExclusiveUnlock()
         {
-            return ::MileTryAcquireSRWLockExclusive(&this->m_SRWLock);
+            this->m_Object.UnlockExclusive();
         }
 
-        _Releases_lock_(m_SRWLock) void ExclusiveUnlock()
+        void SharedLock()
         {
-            ::MileReleaseSRWLockExclusive(&this->m_SRWLock);
+            this->m_Object.LockShared();
         }
 
-        _Acquires_lock_(m_SRWLock) void SharedLock()
+        bool TrySharedLock()
         {
-            ::MileAcquireSRWLockShared(&this->m_SRWLock);
+            return this->m_Object.TryLockShared();
         }
 
-        _Acquires_lock_(m_SRWLock) bool TrySharedLock()
+        void SharedUnlock()
         {
-            return ::MileTryAcquireSRWLockShared(&this->m_SRWLock);
-        }
-
-        _Releases_lock_(m_SRWLock) void SharedUnlock()
-        {
-            ::MileReleaseSRWLockShared(&this->m_SRWLock);
-        }
-    };
-
-    /**
-     * Provides automatic locking and unlocking of a critical section.
-     *
-     * @remarks The AutoLock object must go out of scope before the CritSec.
-     */
-    class AutoCriticalSectionLock
-    {
-    private:
-        CCriticalSection* m_pCriticalSection;
-
-    public:
-        _Acquires_lock_(m_pCriticalSection) AutoCriticalSectionLock(
-            CCriticalSection& CriticalSection) :
-            m_pCriticalSection(&CriticalSection)
-        {
-            m_pCriticalSection->Lock();
-        }
-
-        _Releases_lock_(m_pCriticalSection) ~AutoCriticalSectionLock()
-        {
-            m_pCriticalSection->Unlock();
-        }
-    };
-
-    /**
-     * Provides automatic trying to lock and unlocking of a critical section.
-     *
-     * @remarks The AutoLock object must go out of scope before the CritSec.
-     */
-    class AutoTryCriticalSectionLock
-    {
-    private:
-        CCriticalSection* m_pCriticalSection;
-        bool m_IsLocked = false;
-
-    public:
-        _Acquires_lock_(m_pCriticalSection) AutoTryCriticalSectionLock(
-            CCriticalSection& CriticalSection) :
-            m_pCriticalSection(&CriticalSection)
-        {
-            this->m_IsLocked = m_pCriticalSection->TryLock();
-        }
-
-        _Releases_lock_(m_pCriticalSection) ~AutoTryCriticalSectionLock()
-        {
-            m_pCriticalSection->Unlock();
-        }
-
-        bool IsLocked() const
-        {
-            return this->m_IsLocked;
+            this->m_Object.UnlockShared();
         }
     };
 
@@ -620,10 +496,12 @@ namespace M2
      * terminated.
      */
     template<class ClassType>
-    class CSingleton : CDisableObjectCopying, CDisableObjectMoving
+    class CSingleton :
+        Mile::DisableCopyConstruction,
+        Mile::DisableMoveConstruction
     {
     private:
-        static CCriticalSection m_SingletonCS;
+        static Mile::CriticalSection m_SingletonCS;
         static ClassType* volatile m_Instance = nullptr;
 
     protected:
@@ -633,7 +511,7 @@ namespace M2
     public:
         static ClassType* Get()
         {
-            M2::AutoCriticalSectionLock Lock(this->m_SingletonCS);
+            Mile::AutoCriticalSectionLock Lock(this->m_SingletonCS);
 
             if (!this->m_Instance)
             {
