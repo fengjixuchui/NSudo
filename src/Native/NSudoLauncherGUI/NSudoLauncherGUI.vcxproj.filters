@@ -44,26 +44,17 @@
     <ClInclude Include="Resources\resource.h">
       <Filter>Resources</Filter>
     </ClInclude>
-    <ClInclude Include="CIBuild.h" />
-    <ClInclude Include="NSudoVersion.h" />
+    <ClInclude Include="Mile.Project.Properties.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="M2MessageDialogResource.rc">
       <Filter>M2Win32GUIHelpers</Filter>
     </ResourceCompile>
-    <ResourceCompile Include="Resources\Manifest.rc">
-      <Filter>Resources</Filter>
-    </ResourceCompile>
     <ResourceCompile Include="Resources\NSudo.rc">
-      <Filter>Resources</Filter>
-    </ResourceCompile>
-    <ResourceCompile Include="Resources\Version.rc">
       <Filter>Resources</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Manifest Include="Resources\NSudoWindows.manifest">
-      <Filter>Resources</Filter>
-    </Manifest>
+    <Manifest Include="NSudoLauncherGUI.manifest" />
   </ItemGroup>
 </Project>

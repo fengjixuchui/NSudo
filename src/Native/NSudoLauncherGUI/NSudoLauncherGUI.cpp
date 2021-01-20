@@ -51,7 +51,7 @@
 #include "WTL/atlframe.h"
 #include "WTL/atlmisc.h"
 
-#include "NSudoVersion.h"
+#include "Mile.Project.Properties.h"
 #include "Resources/resource.h"
 
 #include <NSudoLauncherResources.h>
@@ -292,11 +292,11 @@ public:
 
         StringTranslations.emplace(std::make_pair(
             "NSudo.VersionText",
-            L"M2-Team NSudo Launcher " NSUDO_VERSION_STRING_FOR_SHOW));
+            L"M2-Team NSudo Launcher " MILE_PROJECT_VERSION_STRING));
 
         StringTranslations.emplace(std::make_pair(
             "NSudo.LogoText",
-            L"M2-Team NSudo Launcher " NSUDO_VERSION_STRING_FOR_SHOW L"\r\n"
+            L"M2-Team NSudo Launcher " MILE_PROJECT_VERSION_STRING L"\r\n"
             L"© M2-Team. All rights reserved.\r\n"
             L"\r\n"));
 
@@ -1190,6 +1190,8 @@ private:
     }
 };
 
+//#include <Mile.Windows.TrustedLibraryLoader.h>
+
 int WINAPI wWinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -1200,6 +1202,8 @@ int WINAPI wWinMain(
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
     UNREFERENCED_PARAMETER(nShowCmd);
+
+    //::MileLoadLibraryFromSystem32(L"srclient.dll");
 
     /*HANDLE CurrentProcessToken = INVALID_HANDLE_VALUE;
     HRESULT hr = ::MileOpenCurrentProcessToken(

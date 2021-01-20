@@ -32,23 +32,14 @@
     <ClInclude Include="Resources\resource.h">
       <Filter>Resources</Filter>
     </ClInclude>
-    <ClInclude Include="CIBuild.h" />
-    <ClInclude Include="NSudoVersion.h" />
+    <ClInclude Include="Mile.Project.Properties.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Resources\Manifest.rc">
-      <Filter>Resources</Filter>
-    </ResourceCompile>
     <ResourceCompile Include="Resources\NSudo.rc">
       <Filter>Resources</Filter>
     </ResourceCompile>
-    <ResourceCompile Include="Resources\Version.rc">
-      <Filter>Resources</Filter>
-    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Manifest Include="Resources\NSudoConsole.manifest">
-      <Filter>Resources</Filter>
-    </Manifest>
+    <Manifest Include="NSudoLauncherCUI.manifest" />
   </ItemGroup>
 </Project>

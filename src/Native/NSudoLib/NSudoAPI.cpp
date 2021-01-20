@@ -62,6 +62,33 @@ namespace Mile
     };
 }
 
+#include <WtsApi32.h>
+
+DWORD WINAPI TemporarilyGetActiveSessionID()
+{
+    DWORD Count = 0;
+    PWTS_SESSION_INFOW pSessionInfo = nullptr;
+    if (::WTSEnumerateSessionsW(
+        WTS_CURRENT_SERVER_HANDLE,
+        0,
+        1,
+        &pSessionInfo,
+        &Count))
+    {
+        for (DWORD i = 0; i < Count; ++i)
+        {
+            if (pSessionInfo[i].State == WTS_CONNECTSTATE_CLASS::WTSActive)
+            {
+                return pSessionInfo[i].SessionId;
+            }
+        }
+
+        ::WTSFreeMemory(pSessionInfo);
+    }
+
+    return static_cast<DWORD>(-1);
+}
+
 /**
  * @remark You can read the definition for this function in "NSudoAPI.h".
  */
@@ -199,7 +226,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
             ::MileSetCurrentThreadToken(nullptr);
         });
 
-    DWORD ReturnLength = 0;
+    //DWORD ReturnLength = 0;
 
     hr = ::MileOpenCurrentProcessToken(
         MAXIMUM_ALLOWED, &CurrentProcessToken);
@@ -252,7 +279,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         return hr;
     }
 
-    hr = ::MileGetTokenInformation(
+    /*hr = ::MileGetTokenInformation(
         CurrentProcessToken,
         TokenSessionId,
         &SessionID,
@@ -261,6 +288,11 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     if (hr != S_OK)
     {
         return hr;
+    }*/
+    SessionID = TemporarilyGetActiveSessionID();
+    if (SessionID == static_cast<DWORD>(-1))
+    {
+        return ::MileHResultFromWin32(ERROR_NO_TOKEN);
     }
 
     hr = ::MileOpenLsassProcessToken(
@@ -348,6 +380,37 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         if (hr != S_OK)
         {
             return hr;
+        }
+    }
+    else if (NSUDO_USER_MODE_TYPE::CURRENT_USER_ELEVATED == UserModeType)
+    {
+        HANDLE hCurrentProcessToken = nullptr;
+        hr = ::MileCreateSessionToken(SessionID, &hCurrentProcessToken);
+        if (hr == S_OK)
+        {
+            TOKEN_LINKED_TOKEN LinkedToken = { 0 };
+            DWORD ReturnLength = 0;
+
+            hr = ::MileGetTokenInformation(
+                hCurrentProcessToken,
+                TokenLinkedToken,
+                &LinkedToken,
+                sizeof(TOKEN_LINKED_TOKEN),
+                &ReturnLength);
+            if (hr == S_OK)
+            {
+                hr = ::MileDuplicateToken(
+                    LinkedToken.LinkedToken,
+                    MAXIMUM_ALLOWED,
+                    nullptr,
+                    SecurityIdentification,
+                    TokenPrimary,
+                    &OriginalToken);
+
+                ::MileCloseHandle(LinkedToken.LinkedToken);
+            }
+
+            ::MileCloseHandle(hCurrentProcessToken);
         }
     }
     else

@@ -20,7 +20,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <PackageReference Include="VC-LTL">
-      <Version>4.1.1-Beta5</Version>
+      <Version>4.1.1-Beta7</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
@@ -30,7 +30,7 @@
     <None Include="NSudoAPI.def" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="NSudoAPIVersion.rc" />
+    <ClInclude Include="Mile.Project.Properties.h" />
   </ItemGroup>
   <Import Project="..\Mile.Project\Mile.Project.Cpp.targets" />
 </Project>

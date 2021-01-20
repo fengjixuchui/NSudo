@@ -5,6 +5,7 @@
     <RootNamespace>NSudoLauncherGUI</RootNamespace>
     <TargetName>NSudoLG</TargetName>
     <MileProjectType>WindowsApplication</MileProjectType>
+    <MileProjectManifestFile>NSudoLauncherGUI.manifest</MileProjectManifestFile>
   </PropertyGroup>
   <Import Project="..\Mile.Project\Mile.Project.Cpp.props" />
   <ImportGroup Label="PropertySheets">
@@ -21,7 +22,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <PackageReference Include="VC-LTL">
-      <Version>4.1.1-Beta5</Version>
+      <Version>4.1.1-Beta7</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
@@ -33,22 +34,19 @@
     <None Include="Resources\NSudo.json" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CIBuild.h" />
     <ClInclude Include="jsmn.h" />
     <ClInclude Include="M2MessageDialogResource.h" />
     <ClInclude Include="M2Win32GUIHelpers.h" />
     <ClInclude Include="M2WindowsHelpers.h" />
-    <ClInclude Include="NSudoVersion.h" />
+    <ClInclude Include="Mile.Project.Properties.h" />
     <ClInclude Include="Resources\resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="M2MessageDialogResource.rc" />
-    <ResourceCompile Include="Resources\Manifest.rc" />
     <ResourceCompile Include="Resources\NSudo.rc" />
-    <ResourceCompile Include="Resources\Version.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Manifest Include="Resources\NSudoWindows.manifest" />
+    <Manifest Include="NSudoLauncherGUI.manifest" />
   </ItemGroup>
   <Import Project="..\Mile.Project\Mile.Project.Cpp.targets" />
 </Project>

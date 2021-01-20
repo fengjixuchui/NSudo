@@ -5,6 +5,7 @@
     <RootNamespace>NSudoSweeper</RootNamespace>
     <TargetName>NSudoS</TargetName>
     <MileProjectType>WindowsApplication</MileProjectType>
+    <MileProjectManifestFile>NSudoSweeper.manifest</MileProjectManifestFile>
   </PropertyGroup>
   <Import Project="..\Mile.Project\Mile.Project.Cpp.props" />
   <ImportGroup Label="PropertySheets">
@@ -13,7 +14,7 @@
   </ImportGroup>
   <ItemGroup>
     <PackageReference Include="VC-LTL">
-      <Version>4.1.1-Beta5</Version>
+      <Version>4.1.1-Beta7</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
@@ -21,18 +22,14 @@
     <ClCompile Include="NSudoSweeperCore.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Manifest Include="NSudoSweeperManifest.manifest" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="NSudoSweeperManifest.rc" />
-    <ResourceCompile Include="NSudoSweeperVersion.rc" />
-  </ItemGroup>
-  <ItemGroup>
+    <ClInclude Include="Mile.Project.Properties.h" />
     <ClInclude Include="NSudoSweeperCore.h" />
-    <ClInclude Include="NSudoSweeperVersion.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="NSudoSweeperStandardCleanupHandler.toml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="NSudoSweeper.manifest" />
   </ItemGroup>
   <Import Project="..\Mile.Project\Mile.Project.Cpp.targets" />
 </Project>
