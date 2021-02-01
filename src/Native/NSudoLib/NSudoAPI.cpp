@@ -10,9 +10,7 @@
 
 #include "NSudoAPI.h"
 
-#include <Mile.Platform.Windows.h>
-
-#include "Mile.Windows.h"
+#include <Mile.Windows.h>
 
 #include "M2.Base.h"
 
@@ -21,47 +19,6 @@
 
 #include <type_traits>
 #include <utility>
-
-namespace Mile
-{
-    /**
-     * Scope Exit Event Handler (ScopeGuard)
-     */
-    template<typename EventHandlerType>
-    class ScopeExitEventHandler :
-        DisableCopyConstruction,
-        DisableMoveConstruction
-    {
-    private:
-        bool m_Canceled;
-        EventHandlerType m_EventHandler;
-
-    public:
-
-        ScopeExitEventHandler() = delete;
-
-        explicit ScopeExitEventHandler(EventHandlerType&& EventHandler) :
-            m_Canceled(false),
-            m_EventHandler(std::forward<EventHandlerType>(EventHandler))
-        {
-
-        }
-
-        ~ScopeExitEventHandler()
-        {
-            if (!this->m_Canceled)
-            {
-                this->m_EventHandler();
-            }
-        }
-
-        void Cancel()
-        {
-            this->m_Canceled = true;
-        }
-    };
-}
-
 #include <WtsApi32.h>
 
 DWORD WINAPI TemporarilyGetActiveSessionID()
@@ -191,7 +148,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     HANDLE hToken = INVALID_HANDLE_VALUE;
     HANDLE OriginalToken = INVALID_HANDLE_VALUE;
 
-    auto Handler = Mile::ScopeExitEventHandler([&]()
+    auto Handler = Mile::ScopeExitTaskHandler([&]()
         {
             if (CurrentProcessToken !=INVALID_HANDLE_VALUE)
             {
@@ -292,7 +249,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     SessionID = TemporarilyGetActiveSessionID();
     if (SessionID == static_cast<DWORD>(-1))
     {
-        return ::MileHResultFromWin32(ERROR_NO_TOKEN);
+        return Mile::HResult::FromWin32(ERROR_NO_TOKEN);
     }
 
     hr = ::MileOpenLsassProcessToken(
@@ -528,7 +485,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
                 ::MileCloseHandle(ProcessInfo.hThread);
             }
 
-            ::MileFreeMemory(ExpandedString);
+            Mile::HeapMemory::Free(ExpandedString);
         }
 
         ::MileDestroyEnvironmentBlock(lpEnvironment);

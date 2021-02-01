@@ -13,8 +13,7 @@
 #ifndef _M2_WINDOWS_EXTENDED_HELPERS_
 #define _M2_WINDOWS_EXTENDED_HELPERS_
 
-#include <Mile.Platform.Windows.h>
-#include <Mile.Windows.h>
+#include "Mile.Windows.h"
 
 #include <utility>
 
@@ -193,35 +192,6 @@ namespace M2
 
 #pragma endregion
 
-    /**
-     * The handle definer for memory block allocated by the M2AllocMemory and
-     * M2ReAllocMemory function..
-     */
-#pragma region CM2Memory
-
-    template<typename TMemory>
-    struct CM2MemoryDefiner
-    {
-        static inline TMemory GetInvalidValue()
-        {
-            return nullptr;
-        }
-
-        static inline void Close(TMemory Object)
-        {
-            ::MileFreeMemory(Object);
-        }
-    };
-
-    template<typename TMemoryBlock>
-    class CM2Memory :
-        public CObject<TMemoryBlock, CM2MemoryDefiner<TMemoryBlock>>
-    {
-
-    };
-
-#pragma endregion
-
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 
     /**
@@ -335,158 +305,6 @@ namespace M2
             return Result;
         }
 
-    };
-
-    /**
-     * Wraps a slim reader/writer (SRW) lock.
-     */
-    class CSRWLock
-    {
-    private:
-        Mile::SRWLock m_Object;
-
-    public:
-        void ExclusiveLock()
-        {
-            this->m_Object.LockExclusive();
-        }
-
-        bool TryExclusiveLock()
-        {
-            return this->m_Object.TryLockExclusive();
-        }
-
-        void ExclusiveUnlock()
-        {
-            this->m_Object.UnlockExclusive();
-        }
-
-        void SharedLock()
-        {
-            this->m_Object.LockShared();
-        }
-
-        bool TrySharedLock()
-        {
-            return this->m_Object.TryLockShared();
-        }
-
-        void SharedUnlock()
-        {
-            this->m_Object.UnlockShared();
-        }
-    };
-
-    /**
-     * Provides automatic exclusive locking and unlocking of a slim
-     * reader/writer (SRW) lock.
-     *
-     * @remarks The AutoLock object must go out of scope before the CritSec.
-     */
-    class AutoSRWExclusiveLock
-    {
-    private:
-        CSRWLock* m_SRWLock;
-
-    public:
-        _Acquires_lock_(m_SRWLock) AutoSRWExclusiveLock(
-            CSRWLock& SRWLock) :
-            m_SRWLock(&SRWLock)
-        {
-            m_SRWLock->ExclusiveLock();
-        }
-
-        _Releases_lock_(m_SRWLock) ~AutoSRWExclusiveLock()
-        {
-            m_SRWLock->ExclusiveUnlock();
-        }
-    };
-
-    /**
-     * Provides automatic trying to exclusive lock and unlocking of a slim
-     * reader/writer (SRW) lock.
-     *
-     * @remarks The AutoLock object must go out of scope before the CritSec.
-     */
-    class AutoTrySRWExclusiveLock
-    {
-    private:
-        CSRWLock* m_SRWLock;
-        bool m_IsLocked = false;
-
-    public:
-        _Acquires_lock_(m_SRWLock) AutoTrySRWExclusiveLock(
-            CSRWLock& SRWLock) :
-            m_SRWLock(&SRWLock)
-        {
-            this->m_IsLocked = m_SRWLock->TryExclusiveLock();
-        }
-
-        _Releases_lock_(m_SRWLock) ~AutoTrySRWExclusiveLock()
-        {
-            m_SRWLock->ExclusiveUnlock();
-        }
-
-        bool IsLocked() const
-        {
-            return this->m_IsLocked;
-        }
-    };
-
-    /**
-     * Provides automatic shared locking and unlocking of a slim
-     * reader/writer (SRW) lock.
-     *
-     * @remarks The AutoLock object must go out of scope before the CritSec.
-     */
-    class AutoSRWSharedLock
-    {
-    private:
-        CSRWLock* m_SRWLock;
-
-    public:
-        _Acquires_lock_(m_SRWLock) AutoSRWSharedLock(
-            CSRWLock& SRWLock) :
-            m_SRWLock(&SRWLock)
-        {
-            m_SRWLock->SharedLock();
-        }
-
-        _Releases_lock_(m_SRWLock) ~AutoSRWSharedLock()
-        {
-            m_SRWLock->SharedUnlock();
-        }
-    };
-
-    /**
-     * Provides automatic trying to shared lock and unlocking of a slim
-     * reader/writer (SRW) lock.
-     *
-     * @remarks The AutoLock object must go out of scope before the CritSec.
-     */
-    class AutoTrySRWSharedLock
-    {
-    private:
-        CSRWLock* m_SRWLock;
-        bool m_IsLocked = false;
-
-    public:
-        _Acquires_lock_(m_SRWLock) AutoTrySRWSharedLock(
-            CSRWLock& SRWLock) :
-            m_SRWLock(&SRWLock)
-        {
-            this->m_IsLocked = m_SRWLock->TrySharedLock();
-        }
-
-        _Releases_lock_(m_SRWLock) ~AutoTrySRWSharedLock()
-        {
-            m_SRWLock->SharedUnlock();
-        }
-
-        bool IsLocked() const
-        {
-            return this->m_IsLocked;
-        }
     };
 
     /**
@@ -615,22 +433,6 @@ HRESULT M2ThrownPlatformExceptionToHResult();
 #pragma endregion
 
 #pragma region String
-
-/**
- * Converts from the UTF-8 string to the UTF-16 string.
- *
- * @param UTF8String The UTF-8 string you want to convert.
- * @return A converted UTF-16 string.
- */
-std::wstring M2MakeUTF16String(const std::string& UTF8String);
-
-/**
- * Converts from the UTF-16 string to the UTF-8 string.
- *
- * @param UTF16String The UTF-16 string you want to convert.
- * @return A converted UTF-8 string.
- */
-std::string M2MakeUTF8String(const std::wstring& UTF16String);
 
 /**
  * Write formatted data to a string.

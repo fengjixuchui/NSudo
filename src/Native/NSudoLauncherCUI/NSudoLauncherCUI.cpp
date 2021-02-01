@@ -22,7 +22,7 @@
 #include "NSudoAPI.h"
 #include <Mile.Windows.h>
 
-#include "M2WindowsHelpers.h"
+#include <M2WindowsHelpers.h>
 
 #include <commctrl.h>
 #include <Userenv.h>
@@ -263,7 +263,7 @@ private:
             MAKEINTRESOURCEW(uID))))
         {
             // Raw string without the UTF-8 BOM. (0xEF,0xBB,0xBF)	
-            return M2MakeUTF16String(std::string(
+            return Mile::ToUtf16String(std::string(
                 reinterpret_cast<const char*>(ResourceInfo.Pointer) + 3,
                 ResourceInfo.Size - 3));
         }
@@ -344,7 +344,7 @@ public:
                                 std::string(
                                     JsonString + Key.start,
                                     Key.end - Key.start),
-                                M2MakeUTF16String(std::string(
+                                Mile::ToUtf16String(std::string(
                                     JsonString + Value.start,
                                     Value.end - Value.start))));
                         }
@@ -386,12 +386,9 @@ public:
             hr = ::MileGetFileSize(FileHandle, &FileSize);
             if (hr == S_OK)
             {
-                char* FileContent = nullptr;
-
-                hr = ::MileAllocMemory(
-                    static_cast<SIZE_T>(FileSize),
-                    reinterpret_cast<LPVOID*>(&FileContent));
-                if (hr == S_OK)
+                char* FileContent = reinterpret_cast<char*>(
+                    Mile::HeapMemory::Allocate(static_cast<SIZE_T>(FileSize)));
+                if (FileContent)
                 {
                     DWORD NumberOfBytesRead = 0;
                     hr = ::MileReadFile(
@@ -437,10 +434,10 @@ public:
                                         }
 
                                         ShortCutList.emplace(std::make_pair(
-                                            M2MakeUTF16String(std::string(
+                                            Mile::ToUtf16String(std::string(
                                                 JsonString + Key.start,
                                                 Key.end - Key.start)),
-                                            M2MakeUTF16String(std::string(
+                                            Mile::ToUtf16String(std::string(
                                                 JsonString + Value.start,
                                                 Value.end - Value.start))));
                                     }
@@ -452,7 +449,7 @@ public:
                         }
                     }
 
-                    ::MileFreeMemory(FileContent);
+                    Mile::HeapMemory::Free(FileContent);
                 }
             }
 

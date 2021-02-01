@@ -1,7 +1,7 @@
 ﻿/*
  * PROJECT:   Mouri Internal Library Essentials
  * FILE:      Mile.Windows.h
- * PURPOSE:   Mouri Internal Library Essentials Definition for Windows
+ * PURPOSE:   Definition for Windows
  *
  * LICENSE:   The MIT License
  *
@@ -11,116 +11,11 @@
 #ifndef MILE_WINDOWS
 #define MILE_WINDOWS
 
-#include <Windows.h>
+#include "Mile.Windows.Core.h"
 
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 #include <ShellScalingApi.h>
 #endif
-
-/**
- * Maps a system error code to an HRESULT value.
- *
- * @param ErrorCode The system error code.
- * @return The HRESULT value.
- * @remark For more information, see HRESULT_FROM_WIN32.
- */
-EXTERN_C HRESULT WINAPI MileHResultFromWin32(
-    _In_ DWORD ErrorCode);
-
-/**
- * Retrieves the calling thread's last-error code value.
- *
- * @return The return value is the calling thread's last-error code.
- * @remark For more information, see GetLastError.
- */
-EXTERN_C DWORD WINAPI MileGetLastError();
-
-/**
- * Sets the last-error code for the calling thread.
- *
- * @param ErrorCode The last-error code for the thread.
- * @remark For more information, see SetLastError.
- */
-EXTERN_C VOID WINAPI MileSetLastError(
-    _In_ DWORD ErrorCode);
-
-/**
- * Retrieves the calling thread's last-error code value and maps it to an
- * HRESULT value.
- *
- * @return The HRESULT value.
- * @remark For more information, see GetLastError.
- */
-EXTERN_C HRESULT WINAPI MileGetLastErrorAsHResult();
-
-/**
- * Retrieves the calling thread's last-error code value with the evaluation of
- * the Win32 BOOL value.
- *
- * @param Result The Win32 BOOL value.
- * @return The return value is the calling thread's last-error code.
- * @remark For more information, see GetLastError.
- */
-EXTERN_C DWORD WINAPI MileGetLastErrorWithWin32Bool(
-    _In_ BOOL Result);
-
-/**
- * Retrieves the calling thread's last-error code value with the evaluation of
- * thw Win32 BOOL value and maps it to an HRESULT value.
- *
- * @param Result The Win32 BOOL value.
- * @return The HRESULT value.
- * @remark For more information, see GetLastError.
- */
-EXTERN_C HRESULT WINAPI MileGetLastErrorWithWin32BoolAsHResult(
-    _In_ BOOL Result);
-
-/**
- * Allocates a block of memory from the default heap of the calling process.
- * The allocated memory will be initialized to zero. The allocated memory is
- * not movable.
- *
- * @param Size The number of bytes to be allocated.
- * @param Block A pointer to the allocated memory block.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-EXTERN_C HRESULT WINAPI MileAllocMemory(
-    _In_ SIZE_T Size,
-    _Out_ LPVOID* Block);
-
-/**
- * Reallocates a block of memory from the default heap of the calling process.
- * If the reallocation request is for a larger size, the additional region of
- * memory beyond the original size be initialized to zero. This function
- * enables you to resize a memory block and change other memory block
- * properties. The allocated memory is not movable.
- *
- * @param OldBlock A pointer to the block of memory that the function
- *                 reallocates. This pointer is returned by an earlier call to
- *                 the MileAllocMemory or MileReAllocMemory function.
- * @param NewSize The new size of the memory block, in bytes. A memory block's
- *                size can be increased or decreased by using this function.
- * @param NewBlock A pointer to the allocated memory block.
- * @return HRESULT. If the function succeeds, the return value is S_OK. If the
- *         function fails, the original memory is not freed, and the original
- *         handle and pointer are still valid.
- */
-EXTERN_C HRESULT WINAPI MileReAllocMemory(
-    _In_ PVOID OldBlock,
-    _In_ SIZE_T NewSize,
-    _Out_ LPVOID* NewBlock);
-
-/**
- * Frees a memory block allocated from a heap by the MileAllocMemory or
- * MileReAllocMemory function.
- *
- * @param Block A pointer to the memory block to be freed. This pointer is
- *              returned by the AllocMemory or ReAllocMemory function. If this
- *              pointer is nullptr, the behavior is undefined.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-EXTERN_C HRESULT WINAPI MileFreeMemory(
-    _In_ LPVOID Block);
 
 /**
  * Enables or disables privileges in the specified access token. Enabling or
@@ -2121,87 +2016,6 @@ EXTERN_C HRESULT WINAPI MileReOpenFile(
     _Out_opt_ PHANDLE lpFileHandle);
 
 #endif
-
-/**
- * Maps a character string to a UTF-16 (wide character) string. The character
- * string is not necessarily from a multibyte character set.
- *
- * @param CodePage Code page to use in performing the conversion. This
- *                 parameter can be set to the value of any code page that is
- *                 installed or available in the operating system.
- * @param dwFlags Flags indicating the conversion type.
- * @param lpMultiByteStr Pointer to the character string to convert.
- * @param cbMultiByte Size, in bytes, of the string indicated by the
- *                    lpMultiByteStr parameter. Alternatively, this parameter
- *                    can be set to -1 if the string is null-terminated. Note
- *                    that, if cbMultiByte is 0, the function fails.
- * @param lpWideCharStr Pointer to a buffer that receives the converted string.
- * @param cchWideChar Size, in characters, of the buffer indicated by
- *                    lpWideCharStr. If this value is 0, the function returns
- *                    the required buffer size, in characters, including any
- *                    terminating null character, and makes no use of the
- *                    lpWideCharStr buffer.
- * @param pcchReturnWideChar The number of characters written to the buffer
- *                           indicated by lpWideCharStr if successful. If the
- *                           function succeeds and cchWideChar is 0, the return
- *                           value is the required size, in characters, for the
- *                           buffer indicated by lpWideCharStr.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark For more information, see MultiByteToWideChar.
- */
-EXTERN_C HRESULT WINAPI MileMultiByteToWideChar(
-    _In_ UINT CodePage,
-    _In_ DWORD dwFlags,
-    _In_ LPCCH lpMultiByteStr,
-    _In_ INT cbMultiByte,
-    _Out_opt_ LPWSTR lpWideCharStr,
-    _In_ INT cchWideChar,
-    _Out_opt_ LPINT pcchReturnWideChar);
-
-/**
- * Maps a UTF-16 (wide character) string to a new character string. The new
- * character string is not necessarily from a multibyte character set.
- *
- * @param CodePage Code page to use in performing the conversion. This
- *                 parameter can be set to the value of any code page that is
- *                 installed or available in the operating system.
- * @param dwFlags Flags indicating the conversion type.
- * @param lpWideCharStr Pointer to the Unicode string to convert.
- * @param cchWideChar Size, in characters, of the string indicated by
- *                    lpWideCharStr. Alternatively, this parameter can be set
- *                    to -1 if the string is null-terminated. If cchWideChar is
- *                    set to 0, the function fails.
- * @param lpMultiByteStr Pointer to a buffer that receives the converted
- *                       string.
- * @param cbMultiByte Size, in bytes, of the buffer indicated by
- *                    lpMultiByteStr. If this parameter is set to 0, the
- *                    function returns the required buffer size for
- *                    lpMultiByteStr and makes no use of the output parameter
- *                    itself.
- * @param lpDefaultChar Pointer to the character to use if a character cannot
- *                      be represented in the specified code page. The
- *                      application sets this parameter to NULL if the function
- *                      is to use a system default value.
- * @param lpUsedDefaultChar Pointer to a flag that indicates if the function
- *                          has used a default character in the conversion.
- * @param pcchReturnMultiByte The number of bytes written to the buffer pointed
- *                            to by lpMultiByteStr. If the function succeeds
- *                            and cbMultiByte is 0, the return value is the
- *                            required size, in bytes, for the buffer indicated
- *                            by lpMultiByteStr.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- * @remark For more information, see WideCharToMultiByte.
- */
-EXTERN_C HRESULT WINAPI MileWideCharToMultiByte(
-    _In_ UINT CodePage,
-    _In_ DWORD dwFlags,
-    _In_ LPCWCH lpWideCharStr,
-    _In_ INT cchWideChar,
-    _Out_opt_ LPSTR lpMultiByteStr,
-    _In_ INT cbMultiByte,
-    _In_opt_ LPCCH lpDefaultChar,
-    _Out_opt_ LPBOOL lpUsedDefaultChar,
-    _Out_opt_ LPINT pcchReturnMultiByte);
 
 /**
  * Retrieves the path of the system directory. The system directory contains
