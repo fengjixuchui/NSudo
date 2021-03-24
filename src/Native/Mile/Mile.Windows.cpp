@@ -451,16 +451,6 @@ EXTERN_C ULONGLONG WINAPI MileGetTickCount()
     return ::GetTickCount64();
 }
 
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileCloseHandle(
-    _In_ HANDLE hObject)
-{
-    return Mile::HResultFromLastError(
-        ::CloseHandle(hObject));
-}
-
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 
 /**
@@ -1003,7 +993,7 @@ EXTERN_C HRESULT WINAPI MileCreateLUAToken(
 
     if (hr != S_OK)
     {
-        ::MileCloseHandle(TokenHandle);
+        ::CloseHandle(TokenHandle);
         *TokenHandle = INVALID_HANDLE_VALUE;
     }
 
@@ -1092,7 +1082,7 @@ EXTERN_C HRESULT WINAPI MileOpenProcessTokenByProcessId(
     {
         hr = ::MileOpenProcessToken(ProcessHandle, DesiredAccess, TokenHandle);
 
-        ::MileCloseHandle(ProcessHandle);
+        ::CloseHandle(ProcessHandle);
     }
 
     return hr;
@@ -1117,7 +1107,7 @@ EXTERN_C HRESULT WINAPI MileOpenServiceProcessToken(
         hr = ::MileOpenProcessToken(
             ProcessHandle, DesiredAccess, TokenHandle);
 
-        ::MileCloseHandle(ProcessHandle);
+        ::CloseHandle(ProcessHandle);
     }
 
     return hr;
@@ -1143,7 +1133,7 @@ EXTERN_C HRESULT WINAPI MileOpenLsassProcessToken(
         hr = ::MileOpenProcessToken(
             ProcessHandle, DesiredAccess, TokenHandle);
 
-        ::MileCloseHandle(ProcessHandle);
+        ::CloseHandle(ProcessHandle);
     }
 
     return hr;
@@ -1181,76 +1171,7 @@ EXTERN_C HRESULT WINAPI MileOpenThreadTokenByThreadId(
         hr = ::MileOpenThreadToken(
             ThreadHandle, DesiredAccess, OpenAsSelf, TokenHandle);
 
-        ::MileCloseHandle(ThreadHandle);
-    }
-
-    return hr;
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileExpandEnvironmentStrings(
-    _In_ LPCWSTR lpSrc,
-    _Out_opt_ LPWSTR lpDst,
-    _In_ DWORD nSize,
-    _Out_opt_ PDWORD pReturnSize)
-{
-    DWORD ReturnSize = ::ExpandEnvironmentStringsW(lpSrc, lpDst, nSize);
-
-    if (pReturnSize)
-    {
-        *pReturnSize = ReturnSize;
-    }
-
-    return Mile::HResultFromLastError(ReturnSize);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileExpandEnvironmentStringsWithMemory(
-    _In_ LPCWSTR Source,
-    _Out_ LPWSTR* Destination)
-{
-    DWORD AllocatedLength = 0;
-    DWORD ActualLength = 0;
-
-    HRESULT hr = E_INVALIDARG;
-
-    if (Destination)
-    {
-        hr = ::MileExpandEnvironmentStrings(
-            Source,
-            nullptr,
-            0,
-            &AllocatedLength);
-        if (hr == S_OK)
-        {
-            hr = ::MileAllocMemory(
-                AllocatedLength * sizeof(wchar_t),
-                reinterpret_cast<PVOID*>(Destination));
-            if (hr == S_OK)
-            {
-                hr = ::MileExpandEnvironmentStrings(
-                    Source,
-                    *Destination,
-                    AllocatedLength,
-                    &ActualLength);
-                if (hr == S_OK)
-                {
-                    if (AllocatedLength != ActualLength)
-                    {
-                        hr = E_UNEXPECTED;
-                    }
-                }
-            }
-        }
-
-        if (hr != S_OK)
-        {
-            Mile::HeapMemory::Free(*Destination);
-        }
+        ::CloseHandle(ThreadHandle);
     }
 
     return hr;
@@ -1431,276 +1352,6 @@ EXTERN_C DWORD WINAPI MileGetNumberOfHardwareThreads()
 /**
  * @remark You can read the definition for this function in "Mile.Windows.h".
  */
-EXTERN_C HRESULT WINAPI MileRegCloseKey(
-    _In_ HKEY hKey)
-{
-    return Mile::HResult::FromWin32(::RegCloseKey(hKey));
-}
-
-#endif
-
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileRegCreateKey(
-    _In_ HKEY hKey,
-    _In_ LPCWSTR lpSubKey,
-    _Reserved_ DWORD Reserved,
-    _In_opt_ LPWSTR lpClass,
-    _In_ DWORD dwOptions,
-    _In_ REGSAM samDesired,
-    _In_opt_ CONST LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    _Out_ PHKEY phkResult,
-    _Out_opt_ LPDWORD lpdwDisposition)
-{
-    return Mile::HResult::FromWin32(::RegCreateKeyExW(
-        hKey,
-        lpSubKey,
-        Reserved,
-        lpClass,
-        dwOptions,
-        samDesired,
-        lpSecurityAttributes,
-        phkResult,
-        lpdwDisposition));
-}
-
-#endif
-
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileRegQueryValue(
-    _In_ HKEY hKey,
-    _In_opt_ LPCWSTR lpValueName,
-    _Reserved_ LPDWORD lpReserved,
-    _Out_opt_ LPDWORD lpType,
-    _Out_opt_ LPBYTE lpData,
-    _Inout_opt_ LPDWORD lpcbData)
-{
-    return Mile::HResult::FromWin32(::RegQueryValueExW(
-        hKey,
-        lpValueName,
-        lpReserved,
-        lpType,
-        lpData,
-        lpcbData));
-}
-
-#endif
-
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileRegSetValue(
-    _In_ HKEY hKey,
-    _In_opt_ LPCWSTR lpValueName,
-    _Reserved_ DWORD Reserved,
-    _In_ DWORD dwType,
-    _In_opt_ CONST BYTE* lpData,
-    _In_ DWORD cbData)
-{
-    return Mile::HResult::FromWin32(::RegSetValueExW(
-        hKey,
-        lpValueName,
-        Reserved,
-        dwType,
-        lpData,
-        cbData));
-}
-
-#endif
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileGetFileInformation(
-    _In_  HANDLE hFile,
-    _In_  FILE_INFO_BY_HANDLE_CLASS FileInformationClass,
-    _Out_ LPVOID lpFileInformation,
-    _In_  DWORD dwBufferSize)
-{
-    return Mile::HResultFromLastError(
-        ::GetFileInformationByHandleEx(
-            hFile,
-            FileInformationClass,
-            lpFileInformation,
-            dwBufferSize));
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileSetFileInformation(
-    _In_ HANDLE hFile,
-    _In_ FILE_INFO_BY_HANDLE_CLASS FileInformationClass,
-    _In_ LPVOID lpFileInformation,
-    _In_ DWORD dwBufferSize)
-{
-    return Mile::HResultFromLastError(
-        ::SetFileInformationByHandle(
-            hFile,
-            FileInformationClass,
-            lpFileInformation,
-            dwBufferSize));
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileGetFileAttributes(
-    _In_ HANDLE FileHandle,
-    _Out_ PDWORD FileAttributes)
-{
-    FILE_BASIC_INFO BasicInfo;
-
-    HRESULT hr = ::MileGetFileInformation(
-        FileHandle,
-        FILE_INFO_BY_HANDLE_CLASS::FileBasicInfo,
-        &BasicInfo,
-        sizeof(FILE_BASIC_INFO));
-
-    *FileAttributes = (hr == S_OK)
-        ? BasicInfo.FileAttributes
-        : INVALID_FILE_ATTRIBUTES;
-
-    return hr;
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileSetFileAttributes(
-    _In_ HANDLE FileHandle,
-    _In_ DWORD FileAttributes)
-{
-    FILE_BASIC_INFO BasicInfo = { 0 };
-    BasicInfo.FileAttributes =
-        FileAttributes & (
-            FILE_SHARE_READ |
-            FILE_SHARE_WRITE |
-            FILE_SHARE_DELETE |
-            FILE_ATTRIBUTE_ARCHIVE |
-            FILE_ATTRIBUTE_TEMPORARY |
-            FILE_ATTRIBUTE_OFFLINE |
-            FILE_ATTRIBUTE_NOT_CONTENT_INDEXED |
-            FILE_ATTRIBUTE_NO_SCRUB_DATA) |
-        FILE_ATTRIBUTE_NORMAL;
-
-    return ::MileSetFileInformation(
-        FileHandle,
-        FILE_INFO_BY_HANDLE_CLASS::FileBasicInfo,
-        &BasicInfo,
-        sizeof(FILE_BASIC_INFO));
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileGetFileSize(
-    _In_ HANDLE FileHandle,
-    _Out_ PULONGLONG FileSize)
-{
-    FILE_STANDARD_INFO StandardInfo;
-
-    HRESULT hr = ::MileGetFileInformation(
-        FileHandle,
-        FILE_INFO_BY_HANDLE_CLASS::FileStandardInfo,
-        &StandardInfo,
-        sizeof(FILE_STANDARD_INFO));
-
-    *FileSize = (hr == S_OK)
-        ? static_cast<ULONGLONG>(StandardInfo.EndOfFile.QuadPart)
-        : 0;
-
-    return hr;
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileGetFileAllocationSize(
-    _In_ HANDLE FileHandle,
-    _Out_ PULONGLONG AllocationSize)
-{
-    FILE_STANDARD_INFO StandardInfo;
-
-    HRESULT hr = ::MileGetFileInformation(
-        FileHandle,
-        FILE_INFO_BY_HANDLE_CLASS::FileStandardInfo,
-        &StandardInfo,
-        sizeof(FILE_STANDARD_INFO));
-
-    *AllocationSize = (hr == S_OK)
-        ? static_cast<ULONGLONG>(StandardInfo.AllocationSize.QuadPart)
-        : 0;
-
-    return hr;
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileDeleteFile(
-    _In_ HANDLE FileHandle)
-{
-    FILE_DISPOSITION_INFO DispostionInfo;
-    DispostionInfo.DeleteFile = TRUE;
-
-    return ::MileSetFileInformation(
-        FileHandle,
-        FILE_INFO_BY_HANDLE_CLASS::FileDispositionInfo,
-        &DispostionInfo,
-        sizeof(FILE_DISPOSITION_INFO));
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileDeleteFileIgnoreReadonlyAttribute(
-    _In_ HANDLE FileHandle)
-{
-    HRESULT hr = S_OK;
-    DWORD OldAttribute = 0;
-
-    // Save old attributes.
-    hr = ::MileGetFileAttributes(
-        FileHandle,
-        &OldAttribute);
-    if (hr == S_OK)
-    {
-        // Remove readonly attribute.
-        hr = ::MileSetFileAttributes(
-            FileHandle,
-            OldAttribute & (-1 ^ FILE_ATTRIBUTE_READONLY));
-        if (hr == S_OK)
-        {
-            // Delete the file.
-            hr = ::MileDeleteFile(FileHandle);
-            if (hr != S_OK)
-            {
-                // Restore attributes if failed.
-                hr = ::MileSetFileAttributes(
-                    FileHandle,
-                    OldAttribute);
-            }
-        }
-    }
-
-    return hr;
-}
-
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
 EXTERN_C HRESULT WINAPI MileLoadLibrary(
     _In_ LPCWSTR lpLibFileName,
     _Reserved_ HANDLE hFile,
@@ -1787,65 +1438,6 @@ EXTERN_C HRESULT WINAPI MileCreateFile(
 /**
  * @remark You can read the definition for this function in "Mile.Windows.h".
  */
-EXTERN_C HRESULT WINAPI MileGetCompressedFileSize(
-    _In_ HANDLE FileHandle,
-    _Out_ PULONGLONG CompressedFileSize)
-{
-    FILE_COMPRESSION_INFO FileCompressionInfo;
-    HRESULT hr = ::MileGetFileInformation(
-        FileHandle,
-        FILE_INFO_BY_HANDLE_CLASS::FileCompressionInfo,
-        &FileCompressionInfo,
-        sizeof(FILE_COMPRESSION_INFO));
-    if (hr == S_OK)
-    {
-        *CompressedFileSize = static_cast<ULONGLONG>(
-            FileCompressionInfo.CompressedFileSize.QuadPart);
-    }
-    else
-    {
-        hr = ::MileGetFileSize(FileHandle, CompressedFileSize);
-    }
-
-    return hr;
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileCoCreateInstance(
-    _In_ REFCLSID rclsid,
-    _In_opt_ LPUNKNOWN pUnkOuter,
-    _In_ DWORD dwClsContext,
-    _In_ REFIID riid,
-    _Out_ LPVOID* ppv)
-{
-    return ::CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileCLSIDFromString(
-    _In_ LPCOLESTR lpsz,
-    _Out_ LPCLSID pclsid)
-{
-    return ::CLSIDFromString(lpsz, pclsid);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileIIDFromString(
-    _In_ LPCOLESTR lpsz,
-    _Out_ LPIID lpiid)
-{
-    return ::IIDFromString(lpsz, lpiid);
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
 EXTERN_C HRESULT WINAPI MileCoCreateInstanceByString(
     _In_ LPCWSTR lpszCLSID,
     _In_opt_ LPUNKNOWN pUnkOuter,
@@ -1860,19 +1452,19 @@ EXTERN_C HRESULT WINAPI MileCoCreateInstanceByString(
         CLSID clsid;
         IID iid;
 
-        hr = ::MileCLSIDFromString(lpszCLSID, &clsid);
+        hr = ::CLSIDFromString(lpszCLSID, &clsid);
         if (hr != S_OK)
         {
             break;
         }
 
-        hr = ::MileIIDFromString(lpszIID, &iid);
+        hr = ::IIDFromString(lpszIID, &iid);
         if (hr != S_OK)
         {
             break;
         }
 
-        hr = ::MileCoCreateInstance(clsid, pUnkOuter, dwClsContext, iid, ppv);
+        hr = ::CoCreateInstance(clsid, pUnkOuter, dwClsContext, iid, ppv);
 
     } while (false);
 
@@ -1892,26 +1484,26 @@ EXTERN_C HRESULT WINAPI MileRegQueryStringValue(
     *lpData = nullptr;
 
     DWORD cbData = 0;
-    HRESULT hr = ::MileRegQueryValue(
+    HRESULT hr = Mile::HResult::FromWin32(::RegQueryValueExW(
         hKey,
         lpValueName,
         nullptr,
         nullptr,
         nullptr,
-        &cbData);
+        &cbData));
     if (SUCCEEDED(hr))
     {
         hr = ::MileAllocMemory(cbData, reinterpret_cast<PVOID*>(lpData));
         if (SUCCEEDED(hr))
         {
             DWORD Type = 0;
-            hr = ::MileRegQueryValue(
+            hr = Mile::HResult::FromWin32(::RegQueryValueExW(
                 hKey,
                 lpValueName,
                 nullptr,
                 &Type,
                 reinterpret_cast<LPBYTE>(*lpData),
-                &cbData);
+                &cbData));
             if (SUCCEEDED(hr) && REG_SZ != Type)
                 hr = __HRESULT_FROM_WIN32(ERROR_ILLEGAL_ELEMENT_ADDRESS);
 
@@ -1942,7 +1534,7 @@ EXTERN_C HRESULT WINAPI MileCoCheckInterfaceName(
         return E_INVALIDARG;
 
     HKEY hKey = nullptr;
-    HRESULT hr = ::MileRegCreateKey(
+    HRESULT hr = Mile::HResult::FromWin32(::RegCreateKeyExW(
         HKEY_CLASSES_ROOT,
         RegistryKeyPath,
         0,
@@ -1951,7 +1543,7 @@ EXTERN_C HRESULT WINAPI MileCoCheckInterfaceName(
         KEY_READ,
         nullptr,
         &hKey,
-        nullptr);
+        nullptr));
     if (SUCCEEDED(hr))
     {
         wchar_t* InterfaceTypeName = nullptr;
@@ -1966,7 +1558,7 @@ EXTERN_C HRESULT WINAPI MileCoCheckInterfaceName(
             Mile::HeapMemory::Free(InterfaceTypeName);
         }
 
-        ::MileRegCloseKey(hKey);
+        ::RegCloseKey(hKey);
     }
 
     return hr;
@@ -2010,15 +1602,6 @@ EXTERN_C HRESULT WINAPI MileGetDpiForMonitor(
 }
 
 #endif
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C BOOL WINAPI MileIsDots(
-    _In_ LPCWSTR Name)
-{
-    return Name[0] == L'.' && (!Name[1] || (Name[1] == L'.' && !Name[2]));
-}
 
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 
@@ -2094,44 +1677,6 @@ EXTERN_C HRESULT WINAPI MileUnmapViewOfFile(
         ::UnmapViewOfFile(lpBaseAddress));
 }
 
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileReadFile(
-    _In_ HANDLE hFile,
-    _Out_opt_ LPVOID lpBuffer,
-    _In_ DWORD nNumberOfBytesToRead,
-    _Out_opt_ LPDWORD lpNumberOfBytesRead,
-    _Inout_opt_ LPOVERLAPPED lpOverlapped)
-{
-    return Mile::HResultFromLastError(
-        ::ReadFile(
-            hFile,
-            lpBuffer,
-            nNumberOfBytesToRead,
-            lpNumberOfBytesRead,
-            lpOverlapped));
-}
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileWriteFile(
-    _In_ HANDLE hFile,
-    _In_opt_ LPCVOID lpBuffer,
-    _In_ DWORD nNumberOfBytesToWrite,
-    _Out_opt_ LPDWORD lpNumberOfBytesWritten,
-    _Inout_opt_ LPOVERLAPPED lpOverlapped)
-{
-    return Mile::HResultFromLastError(
-        ::WriteFile(
-            hFile,
-            lpBuffer,
-            nNumberOfBytesToWrite,
-            lpNumberOfBytesWritten,
-            lpOverlapped));
-}
-
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 
 /**
@@ -2157,46 +1702,6 @@ EXTERN_C HRESULT WINAPI MileReOpenFile(
 
     return Mile::HResultFromLastError(
         FileHandle != INVALID_HANDLE_VALUE);
-}
-
-#endif
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileGetSystemDirectory(
-    _Out_opt_ LPWSTR lpBuffer,
-    _In_ UINT uSize,
-    _Out_opt_ LPUINT pReturnSize)
-{
-    UINT ReturnSize = ::GetSystemDirectoryW(lpBuffer, uSize);
-
-    if (pReturnSize)
-    {
-        *pReturnSize = ReturnSize;
-    }
-
-    return Mile::HResultFromLastError(ReturnSize);
-}
-
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
-
-/**
- * @remark You can read the definition for this function in "Mile.Windows.h".
- */
-EXTERN_C HRESULT WINAPI MileGetWindowsDirectory(
-    _Out_opt_ LPWSTR lpBuffer,
-    _In_ UINT uSize,
-    _Out_opt_ LPUINT pReturnSize)
-{
-    UINT ReturnSize = ::GetSystemWindowsDirectoryW(lpBuffer, uSize);
-
-    if (pReturnSize)
-    {
-        *pReturnSize = ReturnSize;
-    }
-
-    return Mile::HResultFromLastError(ReturnSize);
 }
 
 #endif

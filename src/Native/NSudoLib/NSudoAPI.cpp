@@ -152,32 +152,32 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         {
             if (CurrentProcessToken !=INVALID_HANDLE_VALUE)
             {
-                ::MileCloseHandle(CurrentProcessToken);
+                ::CloseHandle(CurrentProcessToken);
             }
 
             if (DuplicatedCurrentProcessToken != INVALID_HANDLE_VALUE)
             {
-                ::MileCloseHandle(DuplicatedCurrentProcessToken);
+                ::CloseHandle(DuplicatedCurrentProcessToken);
             }
 
             if (OriginalLsassProcessToken != INVALID_HANDLE_VALUE)
             {
-                ::MileCloseHandle(OriginalLsassProcessToken);
+                ::CloseHandle(OriginalLsassProcessToken);
             }
 
             if (SystemToken != INVALID_HANDLE_VALUE)
             {
-                ::MileCloseHandle(SystemToken);
+                ::CloseHandle(SystemToken);
             }
 
             if (hToken != INVALID_HANDLE_VALUE)
             {
-                ::MileCloseHandle(hToken);
+                ::CloseHandle(hToken);
             }
 
             if (OriginalToken != INVALID_HANDLE_VALUE)
             {
-                ::MileCloseHandle(OriginalToken);
+                ::CloseHandle(OriginalToken);
             }
 
             ::MileSetCurrentThreadToken(nullptr);
@@ -331,7 +331,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         {
             hr = ::MileCreateLUAToken(hCurrentProcessToken, &OriginalToken);
 
-            ::MileCloseHandle(hCurrentProcessToken);
+            ::CloseHandle(hCurrentProcessToken);
         }
 
         if (hr != S_OK)
@@ -364,10 +364,10 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
                     TokenPrimary,
                     &OriginalToken);
 
-                ::MileCloseHandle(LinkedToken.LinkedToken);
+                ::CloseHandle(LinkedToken.LinkedToken);
             }
 
-            ::MileCloseHandle(hCurrentProcessToken);
+            ::CloseHandle(hCurrentProcessToken);
         }
     }
     else
@@ -449,20 +449,17 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
 
     LPVOID lpEnvironment = nullptr;
 
-    LPWSTR ExpandedString = nullptr;
-
     hr = ::MileCreateEnvironmentBlock(&lpEnvironment, hToken, TRUE);
     if (hr == S_OK)
     {
-        hr = ::MileExpandEnvironmentStringsWithMemory(
-            CommandLine,
-            &ExpandedString);
+        std::wstring ExpandedString = Mile::ExpandEnvironmentStringsW(
+            std::wstring(CommandLine));
         if (hr == S_OK)
         {
             hr = ::MileCreateProcessAsUser(
                 hToken,
                 nullptr,
-                ExpandedString,
+                const_cast<LPWSTR>(ExpandedString.c_str()),
                 nullptr,
                 nullptr,
                 FALSE,
@@ -481,11 +478,9 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
                 ::MileWaitForSingleObject(
                     ProcessInfo.hProcess, WaitInterval, FALSE, nullptr);
 
-                ::MileCloseHandle(ProcessInfo.hProcess);
-                ::MileCloseHandle(ProcessInfo.hThread);
+                ::CloseHandle(ProcessInfo.hProcess);
+                ::CloseHandle(ProcessInfo.hThread);
             }
-
-            Mile::HeapMemory::Free(ExpandedString);
         }
 
         ::MileDestroyEnvironmentBlock(lpEnvironment);
@@ -556,7 +551,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     //        ::UnloadUserProfile(LinkedToken.LinkedToken, ProfileInfo.hProfile);
     //    }
 
-    //    ::MileCloseHandle(UserToken);
+    //    ::CloseHandle(UserToken);
     //}
 
 

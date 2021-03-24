@@ -113,7 +113,7 @@ namespace M2
 
         static inline void Close(HANDLE Object)
         {
-            ::MileCloseHandle(Object);
+            ::CloseHandle(Object);
         }
     };
 
@@ -208,7 +208,7 @@ namespace M2
 
         static inline void Close(HKEY Object)
         {
-            ::MileRegCloseKey(Object);
+            ::RegCloseKey(Object);
         }
     };
 
@@ -446,41 +446,6 @@ std::wstring M2FormatString(
     ...);
 
 /**
- * Parses a command line string and returns an array of the command line
- * arguments, along with a count of such arguments, in a way that is similar to
- * the standard C run-time.
- *
- * @param CommandLine A string that contains the full command line. If this
- *                    parameter is an empty string the function returns an
- *                    array with only one empty string.
- * @return An array of the command line arguments, along with a count of such
- *         arguments.
- */
-std::vector<std::wstring> M2SpiltCommandLine(
-    const std::wstring& CommandLine);
-
-/**
- * Parses a command line string and get more friendly result.
- *
- * @param CommandLine A string that contains the full command line. If this
- *                    parameter is an empty string the function returns an
- *                    array with only one empty string.
- * @param OptionPrefixes One or more of the prefixes of option we want to use.
- * @param OptionParameterSeparators One or more of the separators of option we
- *                                  want to use.
- * @param ApplicationName The application name.
- * @param OptionsAndParameters The options and parameters.
- * @param UnresolvedCommandLine The unresolved command line.
- */
-void M2SpiltCommandLineEx(
-    const std::wstring& CommandLine,
-    const std::vector<std::wstring>& OptionPrefixes,
-    const std::vector<std::wstring>& OptionParameterSeparators,
-    std::wstring& ApplicationName,
-    std::map<std::wstring, std::wstring>& OptionsAndParameters,
-    std::wstring& UnresolvedCommandLine);
-
-/**
  * Searches a path for a file name.
  *
  * @param Path A pointer to a null-terminated string of maximum length MAX_PATH
@@ -662,15 +627,6 @@ Platform::Guid M2CreateGuid();
 
 #pragma region Module
 
-/**
- * Retrieves the path of the executable file of the current process.
- *
- * @return If the function succeeds, the return value is the path of the
- *         executable file of the current process. If the function fails, the
- *         return value is an empty string.
- */
-std::wstring M2GetCurrentProcessModulePath();
-
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
 
 /**
@@ -701,26 +657,7 @@ HRESULT M2LoadLibraryEx(
 
 #pragma region Environment
 
-/**
- * Retrieves the path of the system directory.
- *
- * @param SystemFolderPath The string of the path of the system directory.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2GetSystemDirectory(
-    std::wstring& SystemFolderPath);
-
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
-
-/**
- * Retrieves the path of the shared Windows directory on a multi-user system.
- *
- * @param WindowsFolderPath The string of the path of the shared Windows
- *                          directory on a multi-user system.
- * @return HRESULT. If the function succeeds, the return value is S_OK.
- */
-HRESULT M2GetWindowsDirectory(
-    std::wstring& WindowsFolderPath);
 
 /**
  * Enables the Per-Monitor DPI Aware for the specified dialog using the

@@ -19,11 +19,26 @@
 
 #include <Windows.h>
 
+#include <map>
 #include <string>
 #include <utility>
+#include <vector>
+
 namespace Mile
 {
 #pragma region Definitions and Implementations for All Platforms
+
+    /**
+     * @brief Suppresses the "unreferenced parameter" compiler warning by
+     *        referencing a variable which is not used.
+     * @tparam VariableType The type of the variable which is not used.
+     * @param The variable which is not used.
+     * @remark For more information, see UNREFERENCED_PARAMETER.
+    */
+    template<typename VariableType>
+    void UnreferencedParameter(VariableType const&)
+    {
+    }
 
     /**
      * @brief Disables C++ class copy construction.
@@ -1084,7 +1099,452 @@ namespace Mile
 
 #pragma region Definitions for Windows (Win32 Style)
 
+    /**
+     * @brief The definition of the file enumerator handle.
+    */
+    typedef void* FILE_ENUMERATOR_HANDLE;
+    typedef FILE_ENUMERATOR_HANDLE* PFILE_ENUMERATOR_HANDLE;
 
+    /**
+     * @brief The information about a found file or directory queried from the
+     *        file enumerator.
+    */
+    typedef struct _FILE_ENUMERATOR_INFORMATION
+    {
+        FILETIME CreationTime;
+        FILETIME LastAccessTime;
+        FILETIME LastWriteTime;
+        FILETIME ChangeTime;
+        UINT64 FileSize;
+        UINT64 AllocationSize;
+        DWORD FileAttributes;
+        DWORD EaSize;
+        LARGE_INTEGER FileId;
+        WCHAR ShortName[16];
+        WCHAR FileName[256];
+    } FILE_ENUMERATOR_INFORMATION, *PFILE_ENUMERATOR_INFORMATION;
+
+    /**
+     * @brief Sends a control code directly to a specified device driver,
+     *        causing the corresponding device to perform the corresponding
+     *        operation.
+     * @param hDevice A handle to the device on which the operation is to be
+     *                performed. The device is typically a volume, directory,
+     *                file, or stream. To retrieve a device handle, use the
+     *                CreateFile function.
+     * @param dwIoControlCode The control code for the operation. This value
+     *                        identifies the specific operation to be performed
+     *                        and the type of device on which to perform it.
+     * @param lpInBuffer A pointer to the input buffer that contains the data
+     *                   required to perform the operation. The format of this
+     *                   data depends on the value of the dwIoControlCode
+     *                   parameter. This parameter can be nullptr if
+     *                   dwIoControlCode specifies an operation that does not
+     *                   require input data.
+     * @param nInBufferSize The size of the input buffer, in bytes.
+     * @param lpOutBuffer A pointer to the output buffer that is to receive the
+     *                    data returned by the operation. The format of this
+     *                    data depends on the value of the dwIoControlCode
+     *                    parameter. This parameter can be nullptr if
+     *                    dwIoControlCode specifies an operation that does not
+     *                    return data.
+     * @param nOutBufferSize The size of the output buffer, in bytes.
+     * @param lpBytesReturned A pointer to a variable that receives the size of
+     *                        the data stored in the output buffer, in bytes.
+     *                        If the output buffer is too small to receive any
+     *                        data, the call fails, GetLastError returns
+     *                        ERROR_INSUFFICIENT_BUFFER, and lpBytesReturned is
+     *                        zero. If the output buffer is too small to hold
+     *                        all of the data but can hold some entries, some
+     *                        drivers will return as much data as fits. In this
+     *                        case, the call fails, GetLastError returns
+     *                        ERROR_MORE_DATA, and lpBytesReturned indicates
+     *                        the amount of data received. Your application
+     *                        should call DeviceIoControl again with the same
+     *                        operation, specifying a new starting point.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+     * @remark For more information, see DeviceIoControl.
+    */
+    HResultFromLastError DeviceIoControl(
+        _In_ HANDLE hDevice,
+        _In_ DWORD dwIoControlCode,
+        _In_opt_ LPVOID lpInBuffer,
+        _In_ DWORD nInBufferSize,
+        _Out_opt_ LPVOID lpOutBuffer,
+        _In_ DWORD nOutBufferSize,
+        _Out_opt_ LPDWORD lpBytesReturned);
+
+    /**
+     * @brief Gets the NTFS compression attribute.
+     * @param FileHandle A handle to the file or directory on which the
+     *                   operation is to be performed. To retrieve a handle,
+     *                   use the CreateFile or a similar API.
+     * @param CompressionAlgorithm Specifies the compression algorithm that is
+     *                             used to compress this file. Currently
+     *                             defined algorithms are:
+     *                             COMPRESSION_FORMAT_NONE
+     *                                 Uncompress the file or directory.
+     *                             COMPRESSION_FORMAT_DEFAULT
+     *                                 Compress the file or directory, using
+     *                                 the default compression format.
+     *                             COMPRESSION_FORMAT_LZNT1
+     *                                 Compress the file or directory, using
+     *                                 the LZNT1 compression format.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError GetNtfsCompressionAttribute(
+        _In_ HANDLE FileHandle,
+        _Out_ PUSHORT CompressionAlgorithm);
+
+    /**
+     * @brief Sets the NTFS compression attribute.
+     * @param FileHandle A handle to the file or directory on which the
+     *                   operation is to be performed. To retrieve a handle,
+     *                   use the CreateFile or a similar API.
+     * @param CompressionAlgorithm Specifies the compression algorithm that is
+     *                             used to compress this file. Currently
+     *                             defined algorithms are:
+     *                             COMPRESSION_FORMAT_NONE
+     *                                 Uncompress the file or directory.
+     *                             COMPRESSION_FORMAT_DEFAULT
+     *                                 Compress the file or directory, using
+     *                                 the default compression format.
+     *                             COMPRESSION_FORMAT_LZNT1
+     *                                 Compress the file or directory, using
+     *                                 the LZNT1 compression format.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError SetNtfsCompressionAttribute(
+        _In_ HANDLE FileHandle,
+        _In_ USHORT CompressionAlgorithm);
+
+    /**
+     * @brief Gets the Windows Overlay Filter file compression attribute.
+     * @param FileHandle A handle to the file on which the operation is to be
+     *                   performed. To retrieve a handle, use the CreateFile or
+     *                   a similar API.
+     * @param CompressionAlgorithm Specifies the compression algorithm that is
+     *                             used to compress this file. Currently
+     *                             defined algorithms are:
+     *                             FILE_PROVIDER_COMPRESSION_XPRESS4K
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 4kb chunks with
+     *                                 the XPress algorithm. This algorithm is
+     *                                 designed to be computationally
+     *                                 lightweight, and provides for rapid
+     *                                 access to data.
+     *                             FILE_PROVIDER_COMPRESSION_LZX
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 32kb chunks with
+     *                                 the LZX algorithm. This algorithm is
+     *                                 designed to be highly compact, and
+     *                                 provides for small footprint for
+     *                                 infrequently accessed data.
+     *                             FILE_PROVIDER_COMPRESSION_XPRESS8K
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 8kb chunks with
+     *                                 the XPress algorithm.
+     *                             FILE_PROVIDER_COMPRESSION_XPRESS16K
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 16kb chunks with
+     *                                 the XPress algorithm.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError GetWofCompressionAttribute(
+        _In_ HANDLE FileHandle,
+        _Out_ PDWORD CompressionAlgorithm);
+
+    /**
+     * @brief Sets the Windows Overlay Filter file compression attribute.
+     * @param FileHandle A handle to the file on which the operation is to be
+     *                   performed. To retrieve a handle, use the CreateFile or
+     *                   a similar API.
+     * @param CompressionAlgorithm Specifies the compression algorithm that is
+     *                             used to compress this file. Currently
+     *                             defined algorithms are:
+     *                             FILE_PROVIDER_COMPRESSION_XPRESS4K
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 4kb chunks with
+     *                                 the XPress algorithm. This algorithm is
+     *                                 designed to be computationally
+     *                                 lightweight, and provides for rapid
+     *                                 access to data.
+     *                             FILE_PROVIDER_COMPRESSION_LZX
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 32kb chunks with
+     *                                 the LZX algorithm. This algorithm is
+     *                                 designed to be highly compact, and
+     *                                 provides for small footprint for
+     *                                 infrequently accessed data.
+     *                             FILE_PROVIDER_COMPRESSION_XPRESS8K
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 8kb chunks with
+     *                                 the XPress algorithm.
+     *                             FILE_PROVIDER_COMPRESSION_XPRESS16K
+     *                                 Indicates that the data for the file
+     *                                 should be compressed in 16kb chunks with
+     *                                 the XPress algorithm.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError SetWofCompressionAttribute(
+        _In_ HANDLE FileHandle,
+        _In_ DWORD CompressionAlgorithm);
+
+    /**
+     * @brief Removes the Windows Overlay Filter file compression attribute.
+     * @param FileHandle A handle to the file on which the operation is to be
+     *                   performed. To retrieve a handle, use the CreateFile or
+     *                   a similar API.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError RemoveWofCompressionAttribute(
+        _In_ HANDLE FileHandle);
+
+    /**
+     * @brief Sets the system's compression (Compact OS) state.
+     * @param DeploymentState The system's compression (Compact OS) state. If
+     *                        this value is TRUE, the system state means
+     *                        Compact. If it is FALSE, the system state means
+     *                        non Compact.
+     * @return An HResult object containing the error code.
+    */
+    HResult GetCompactOsDeploymentState(
+        _Out_ PDWORD DeploymentState);
+
+    /**
+     * @brief Gets the system's compression (Compact OS) state.
+     * @param DeploymentState The system's compression (Compact OS) state. If
+     *                        this value is TRUE, the function sets the system
+     *                        state to Compact. If it is FALSE, the function
+     *                        sets the system state to non Compact.
+     * @return An HResult object containing the error code.
+    */
+    HResult SetCompactOsDeploymentState(
+        _In_ DWORD DeploymentState);
+
+    /**
+     * @brief Creates a file enumerator handle for searching a directory for a
+     *        file or subdirectory with a name.
+     * @param FileEnumeratorHandle The file enumerator handle.
+     * @param FileHandle The handle of the file to be searched a directory for
+     *                   a file or subdirectory with a name. This handle must
+     *                   be opened with the appropriate permissions for the
+     *                   requested change. This handle should not be a pipe
+     *                   handle.
+     * @return An HResult object containing the error code.
+    */
+    HResult CreateFileEnumerator(
+        _Out_ PFILE_ENUMERATOR_HANDLE FileEnumeratorHandle,
+        _In_ HANDLE FileHandle);
+
+    /**
+     * @brief Closes a file enumerator handle opened by CreateFileEnumerator.
+     * @param FileEnumeratorHandle The file enumerator handle.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError CloseFileEnumerator(
+        _In_ FILE_ENUMERATOR_HANDLE FileEnumeratorHandle);
+
+    /**
+     * @brief Starts or continues a file search from a file enumerator handle.
+     * @param FileEnumeratorHandle The file enumerator handle.
+     * @param FileEnumeratorInformation A pointer to the
+     *                                  FILE_ENUMERATOR_INFORMATION structure
+     *                                  that receives information about a found
+     *                                  file or directory.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code. If the function succeeds, the
+     *         FileEnumeratorInformation parameter contains information about
+     *         the next file or directory found. If the function fails, the
+     *         contents of FileEnumeratorInformation are indeterminate. If the
+     *         function fails because no more matching files can be found,
+     *         the error code is HRESULT_FROM_WIN32(ERROR_NO_MORE_FILES).
+    */
+    HResultFromLastError QueryFileEnumerator(
+        _In_ FILE_ENUMERATOR_HANDLE FileEnumeratorHandle,
+        _Out_ PFILE_ENUMERATOR_INFORMATION FileEnumeratorInformation);
+
+    /**
+     * @brief Retrieves the size of the specified file.
+     * @param FileHandle A handle to the file that contains the information to
+     *                   be retrieved. This handle should not be a pipe handle.
+     * @param FileSize A pointer to a ULONGLONG value that receives the file
+     *                 size, in bytes.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError GetFileSize(
+        _In_ HANDLE FileHandle,
+        _Out_ PULONGLONG FileSize);
+
+    /**
+     * @brief Retrieves the amount of space that is allocated for the file.
+     * @param FileHandle A handle to the file that contains the information to
+     *                   be retrieved. This handle should not be a pipe handle.
+     * @param AllocationSize A pointer to a ULONGLONG value that receives the
+     *                       amount of space that is allocated for the file, in
+     *                       bytes.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError GetFileAllocationSize(
+        _In_ HANDLE FileHandle,
+        _Out_ PULONGLONG AllocationSize);
+
+    /**
+     * @brief Retrieves the actual number of bytes of disk storage used to
+     *        store a specified file. If the file is located on a volume that
+     *        supports compression and the file is compressed, the value
+     *        obtained is the compressed size of the specified file. If the
+     *        file is located on a volume that supports sparse files and the
+     *        file is a sparse file, the value obtained is the sparse size of
+     *        the specified file.
+     * @param FileHandle A handle to the file that contains the information to
+     *                   be retrieved. This handle should not be a pipe handle.
+     * @param CompressedFileSize A pointer to a ULONGLONG value that receives
+     *                           the compressed file size, in bytes.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError GetCompressedFileSizeByHandle(
+        _In_ HANDLE FileHandle,
+        _Out_ PULONGLONG CompressedFileSize);
+
+    /**
+     * @brief Retrieves file system attributes for a specified file or
+     *        directory.
+     * @param FileHandle A handle to the file that contains the information to
+     *                   be retrieved. This handle should not be a pipe handle.
+     * @param FileAttributes The attributes of the specified file or directory.
+     *                       For a list of attribute values and their
+     *                       descriptions, see File Attribute Constants. If the
+     *                       function fails, the return value is
+     *                       INVALID_FILE_ATTRIBUTES.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError GetFileAttributesByHandle(
+        _In_ HANDLE FileHandle,
+        _Out_ PDWORD FileAttributes);
+
+    /**
+     * @brief Sets the attributes for a file or directory.
+     * @param FileHandle A handle to the file for which to change information.
+     *                   This handle must be opened with the appropriate
+     *                   permissions for the requested change. This handle
+     *                   should not be a pipe handle.
+     * @param FileAttributes The file attributes to set for the file. This
+     *                       parameter can be one or more values, combined
+     *                       using the bitwise - OR operator. However, all
+     *                       other values override FILE_ATTRIBUTE_NORMAL. For
+     *                       more information, see the SetFileAttributes
+     *                       function.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError SetFileAttributesByHandle(
+        _In_ HANDLE FileHandle,
+        _In_ DWORD FileAttributes);
+
+    /**
+     * @brief Deletes an existing file.
+     * @param FileHandle The handle of the file to be deleted. This handle must
+     *                   be opened with the appropriate permissions for the
+     *                   requested change. This handle should not be a pipe
+     *                   handle.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+    */
+    HResultFromLastError DeleteFileByHandle(
+        _In_ HANDLE FileHandle);
+
+    /**
+     * @brief Deletes an existing file, even the file have the readonly
+     *        attribute.
+     * @param FileHandle The handle of the file to be deleted. This handle must
+     *                   be opened with the appropriate permissions for the
+     *                   requested change. This handle should not be a pipe
+     *                   handle.
+     * @return An HResult object containing the error code.
+    */
+    HResult DeleteFileByHandleIgnoreReadonlyAttribute(
+        _In_ HANDLE FileHandle);
+
+    /**
+     * @brief Tests for the current directory and parent directory markers *
+              while iterating through files.
+     * @param Name The name of the file or directory for testing.
+     * @return Nonzero if the found file has the name "." or "..", which
+     *         indicates that the found file is actually a directory. Otherwise
+     *         zero.
+    */
+    BOOL IsDotsName(
+        _In_ LPCWSTR Name);
+
+    /**
+     * @brief Reads data from the specified file or input/output (I/O) device.
+     *        Reads occur at the position specified by the file pointer if
+     *        supported by the device.
+     * @param hFile A handle to the device (for example, a file, file stream,
+     *              physical disk, volume, console buffer, tape drive, socket,
+     *              communications resource, mailslot, or pipe).
+     * @param lpBuffer A pointer to the buffer that receives the data read from
+     *                 a file or device. This buffer must remain valid for the
+     *                 duration of the read operation. The caller must not use
+     *                 this buffer until the read operation is completed.
+     * @param nNumberOfBytesToRead The maximum number of bytes to be read.
+     * @param lpNumberOfBytesRead A pointer to the variable that receives the
+     *                            number of bytes read when using a synchronous
+     *                            hFile parameter. Mile::ReadFile sets this
+     *                            value to zero before doing any work or error
+     *                            checking.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+     * @remark For more information, see ReadFile.
+    */
+    HResultFromLastError ReadFile(
+        _In_ HANDLE hFile,
+        _Out_opt_ LPVOID lpBuffer,
+        _In_ DWORD nNumberOfBytesToRead,
+        _Out_ LPDWORD lpNumberOfBytesRead);
+
+    /**
+     * @brief Writes data to the specified file or input/output (I/O) device.
+     * @param hFile A handle to the device (for example, a file, file stream,
+     *              physical disk, volume, console buffer, tape drive, socket,
+     *              communications resource, mailslot, or pipe).
+     * @param lpBuffer A pointer to the buffer containing the data to be
+     *                 written to the file or device. This buffer must remain
+     *                 valid for the duration of the write operation. The
+     *                 caller must not use this buffer until the write
+     *                 operation is completed.
+     * @param nNumberOfBytesToWrite The number of bytes to be written to the
+     *                              file or device. A value of zero specifies a
+     *                              null write operation. The behavior of a
+     *                              null write operation depends on the
+     *                              underlying file system or communications
+     *                              technology.
+     * @param lpNumberOfBytesWritten A pointer to the variable that receives
+     *                               the number of bytes written when using a
+     *                               synchronous hFile parameter.
+     *                               Mile::WriteFile sets this value to zero
+     *                               before doing any work or error checking.
+     * @return An HResultFromLastError object An containing the HResult object
+     *         containing the error code.
+     * @remark For more information, see WriteFile.
+    */
+    HResultFromLastError WriteFile(
+        _In_ HANDLE hFile,
+        _In_opt_ LPCVOID lpBuffer,
+        _In_ DWORD nNumberOfBytesToWrite,
+        _Out_ LPDWORD lpNumberOfBytesWritten);
 
 #pragma endregion
 
@@ -1101,7 +1561,8 @@ namespace Mile
     /**
      * @brief Converts from the UTF-8 string to the UTF-16 string.
      * @param Utf8String The UTF-8 string you want to convert.
-     * @return A converted UTF-16 string.
+     * @return A converted UTF-16 string if successful, an empty string
+     *         otherwise.
     */
     std::wstring ToUtf16String(
         std::string const& Utf8String);
@@ -1109,10 +1570,84 @@ namespace Mile
     /**
      * @brief Converts from the UTF-16 string to the UTF-8 string.
      * @param Utf16String The UTF-16 string you want to convert.
-     * @return A converted UTF-8 string.
+     * @return A converted UTF-8 string if successful, an empty string
+     *         otherwise.
     */
     std::string ToUtf8String(
         std::wstring const& Utf16String);
+
+    /**
+     * @brief Retrieves the path of the system directory. The system directory
+     *        contains system files such as dynamic-link libraries and drivers.
+     * @return The path of the system directory if successful, an empty string
+     *         otherwise.
+    */
+    std::wstring GetSystemDirectoryW();
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+
+    /**
+     * @brief Retrieves the path of the shared Windows directory on a
+     *        multi-user system.
+     * @return The path of the shared Windows directory on a multi-user system
+     *         if successful, an empty string otherwise.
+    */
+    std::wstring GetWindowsDirectoryW();
+
+#endif
+
+    /**
+     * @brief Expands environment variable strings and replaces them with the
+     *        values defined for the current user.
+     * @param SourceString The string that contains one or more environment
+                           variable strings (in the %variableName% form) you
+                           need to expand.
+     * @return The result string of expanding the environment variable strings
+     *         if successful, an empty string otherwise.
+    */
+    std::wstring ExpandEnvironmentStringsW(
+        std::wstring const& SourceString);
+
+    /**
+     * @brief Retrieves the path of the executable file of the current process.
+     * @return The path of the executable file of the current process if
+     *         successful, an empty string otherwise.
+    */
+    std::wstring GetCurrentProcessModulePath();
+
+    /**
+     * @brief Parses a command line string and returns an array of the command
+     *        line arguments, along with a count of such arguments, in a way
+     *        that is similar to the standard C run-time.
+     * @param CommandLine A string that contains the full command line. If this
+     *                    parameter is an empty string the function returns an
+     *                    array with only one empty string.
+     * @return An array of the command line arguments, along with a count of such
+     *         arguments. 
+    */
+    std::vector<std::wstring> SpiltCommandLine(
+        std::wstring const& CommandLine);
+
+    /**
+     * @brief Parses a command line string and get more friendly result.
+     * @param CommandLine A string that contains the full command line. If this
+     *                    parameter is an empty string the function returns an
+     *                    array with only one empty string.
+     * @param OptionPrefixes One or more of the prefixes of option we want to
+     *                       use.
+     * @param OptionParameterSeparators One or more of the separators of option
+     *                                  we want to use.
+     * @param ApplicationName The application name.
+     * @param OptionsAndParameters The options and parameters.
+     * @param UnresolvedCommandLine The unresolved command line.
+    */
+    void SpiltCommandLineEx(
+        std::wstring const& CommandLine,
+        std::vector<std::wstring> const& OptionPrefixes,
+        std::vector<std::wstring> const& OptionParameterSeparators,
+        std::wstring& ApplicationName,
+        std::map<std::wstring, std::wstring>& OptionsAndParameters,
+        std::wstring& UnresolvedCommandLine);
 
 #pragma endregion
 }
