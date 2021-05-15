@@ -19,32 +19,11 @@
 
 #include <type_traits>
 #include <utility>
-#include <WtsApi32.h>
 
-DWORD WINAPI TemporarilyGetActiveSessionID()
-{
-    DWORD Count = 0;
-    PWTS_SESSION_INFOW pSessionInfo = nullptr;
-    if (::WTSEnumerateSessionsW(
-        WTS_CURRENT_SERVER_HANDLE,
-        0,
-        1,
-        &pSessionInfo,
-        &Count))
-    {
-        for (DWORD i = 0; i < Count; ++i)
-        {
-            if (pSessionInfo[i].State == WTS_CONNECTSTATE_CLASS::WTSActive)
-            {
-                return pSessionInfo[i].SessionId;
-            }
-        }
-
-        ::WTSFreeMemory(pSessionInfo);
-    }
-
-    return static_cast<DWORD>(-1);
-}
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM)
+#include <Userenv.h>
+#pragma comment(lib, "Userenv.lib")
+#endif
 
 /**
  * @remark You can read the definition for this function in "NSudoAPI.h".
@@ -142,7 +121,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     HANDLE CurrentProcessToken = INVALID_HANDLE_VALUE;
     HANDLE DuplicatedCurrentProcessToken = INVALID_HANDLE_VALUE;
     
-    HANDLE OriginalLsassProcessToken = INVALID_HANDLE_VALUE;
+    HANDLE OriginalSystemToken = INVALID_HANDLE_VALUE;
     HANDLE SystemToken = INVALID_HANDLE_VALUE;
 
     HANDLE hToken = INVALID_HANDLE_VALUE;
@@ -160,9 +139,9 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
                 ::CloseHandle(DuplicatedCurrentProcessToken);
             }
 
-            if (OriginalLsassProcessToken != INVALID_HANDLE_VALUE)
+            if (OriginalSystemToken != INVALID_HANDLE_VALUE)
             {
-                ::CloseHandle(OriginalLsassProcessToken);
+                ::CloseHandle(OriginalSystemToken);
             }
 
             if (SystemToken != INVALID_HANDLE_VALUE)
@@ -180,25 +159,23 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
                 ::CloseHandle(OriginalToken);
             }
 
-            ::MileSetCurrentThreadToken(nullptr);
+            ::SetThreadToken(nullptr, nullptr);
         });
 
-    //DWORD ReturnLength = 0;
-
-    hr = ::MileOpenCurrentProcessToken(
-        MAXIMUM_ALLOWED, &CurrentProcessToken);
+    hr = Mile::HResultFromLastError(::OpenProcessToken(
+        ::GetCurrentProcess(), MAXIMUM_ALLOWED, &CurrentProcessToken));
     if (hr != S_OK)
     {
         return hr;
     }
 
-    hr = ::MileDuplicateToken(
+    hr = Mile::HResultFromLastError(::DuplicateTokenEx(
         CurrentProcessToken,
         MAXIMUM_ALLOWED,
         nullptr,
         SecurityImpersonation,
         TokenImpersonation,
-        &DuplicatedCurrentProcessToken);
+        &DuplicatedCurrentProcessToken));
     if (hr != S_OK)
     {
         return hr;
@@ -206,7 +183,8 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
 
     LUID_AND_ATTRIBUTES RawPrivilege;
 
-    hr = ::MileGetPrivilegeValue(SE_DEBUG_NAME, &RawPrivilege.Luid);
+    hr = Mile::HResultFromLastError(::LookupPrivilegeValueW(
+        nullptr, SE_DEBUG_NAME, &RawPrivilege.Luid));
     if (hr != S_OK)
     {
         return hr;
@@ -214,7 +192,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
 
     RawPrivilege.Attributes = SE_PRIVILEGE_ENABLED;
 
-    hr = ::MileAdjustTokenPrivilegesSimple(
+    hr = Mile::AdjustTokenPrivilegesSimple(
         DuplicatedCurrentProcessToken,
         &RawPrivilege,
         1);
@@ -223,56 +201,38 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         return hr;
     }
 
-    hr = ::MileSetCurrentThreadToken(DuplicatedCurrentProcessToken);
+    hr = Mile::HResultFromLastError(::SetThreadToken(
+        nullptr, DuplicatedCurrentProcessToken));
     if (hr != S_OK)
     {
         return hr;
     }
 
-    hr = ::MileOpenCurrentThreadToken(
-        MAXIMUM_ALLOWED, FALSE, &CurrentProcessToken);
-    if (hr != S_OK)
-    {
-        return hr;
-    }
-
-    /*hr = ::MileGetTokenInformation(
-        CurrentProcessToken,
-        TokenSessionId,
-        &SessionID,
-        sizeof(DWORD),
-        &ReturnLength);
-    if (hr != S_OK)
-    {
-        return hr;
-    }*/
-    SessionID = TemporarilyGetActiveSessionID();
+    SessionID = Mile::GetActiveSessionID();
     if (SessionID == static_cast<DWORD>(-1))
     {
         return Mile::HResult::FromWin32(ERROR_NO_TOKEN);
     }
 
-    hr = ::MileOpenLsassProcessToken(
-        MAXIMUM_ALLOWED,
-        &OriginalLsassProcessToken);
+    hr = Mile::CreateSystemToken(MAXIMUM_ALLOWED, &OriginalSystemToken);
     if (hr != S_OK)
     {
         return hr;
     }
 
-    hr = ::MileDuplicateToken(
-        OriginalLsassProcessToken,
+    hr = Mile::HResultFromLastError(::DuplicateTokenEx(
+        OriginalSystemToken,
         MAXIMUM_ALLOWED,
         nullptr,
         SecurityImpersonation,
         TokenImpersonation,
-        &SystemToken);
+        &SystemToken));
     if (hr != S_OK)
     {
         return hr;
     }
 
-    hr = ::MileAdjustTokenAllPrivileges(
+    hr = Mile::AdjustTokenAllPrivileges(
         SystemToken,
         SE_PRIVILEGE_ENABLED);
     if (hr != S_OK)
@@ -280,7 +240,8 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         return hr;
     }
 
-    hr = ::MileSetCurrentThreadToken(SystemToken);
+    hr = Mile::HResultFromLastError(::SetThreadToken(
+        nullptr, SystemToken));
     if (hr != S_OK)
     {
         return hr;
@@ -288,7 +249,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
 
     if (NSUDO_USER_MODE_TYPE::TRUSTED_INSTALLER == UserModeType)
     {
-        hr = ::MileOpenServiceProcessToken(
+        hr = Mile::OpenServiceProcessToken(
             L"TrustedInstaller",
             MAXIMUM_ALLOWED,
             &OriginalToken);
@@ -299,7 +260,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     }
     else if (NSUDO_USER_MODE_TYPE::SYSTEM == UserModeType)
     {
-        hr = ::MileOpenLsassProcessToken(MAXIMUM_ALLOWED, &OriginalToken);
+        hr = Mile::CreateSystemToken(MAXIMUM_ALLOWED, &OriginalToken);
         if (hr != S_OK)
         {
             return hr;
@@ -307,7 +268,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     }
     else if (NSUDO_USER_MODE_TYPE::CURRENT_USER == UserModeType)
     {
-        hr = ::MileCreateSessionToken(SessionID, &OriginalToken);
+        hr = Mile::CreateSessionToken(SessionID, &OriginalToken);
         if (hr != S_OK)
         {
             return hr;
@@ -315,7 +276,8 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     }
     else if (NSUDO_USER_MODE_TYPE::CURRENT_PROCESS == UserModeType)
     {
-        hr = ::MileOpenCurrentProcessToken(MAXIMUM_ALLOWED, &OriginalToken);
+        hr = Mile::HResultFromLastError(::OpenProcessToken(
+            ::GetCurrentProcess(), MAXIMUM_ALLOWED, &OriginalToken));
         if (hr != S_OK)
         {
             return hr;
@@ -324,12 +286,11 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     else if (NSUDO_USER_MODE_TYPE::CURRENT_PROCESS_DROP_RIGHT == UserModeType)
     {
         HANDLE hCurrentProcessToken = nullptr;
-        hr = ::MileOpenCurrentProcessToken(
-            MAXIMUM_ALLOWED,
-            &hCurrentProcessToken);
+        hr = Mile::HResultFromLastError(::OpenProcessToken(
+            ::GetCurrentProcess(), MAXIMUM_ALLOWED, &hCurrentProcessToken));
         if (hr == S_OK)
         {
-            hr = ::MileCreateLUAToken(hCurrentProcessToken, &OriginalToken);
+            hr = Mile::CreateLUAToken(hCurrentProcessToken, &OriginalToken);
 
             ::CloseHandle(hCurrentProcessToken);
         }
@@ -342,27 +303,27 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     else if (NSUDO_USER_MODE_TYPE::CURRENT_USER_ELEVATED == UserModeType)
     {
         HANDLE hCurrentProcessToken = nullptr;
-        hr = ::MileCreateSessionToken(SessionID, &hCurrentProcessToken);
+        hr = Mile::CreateSessionToken(SessionID, &hCurrentProcessToken);
         if (hr == S_OK)
         {
             TOKEN_LINKED_TOKEN LinkedToken = { 0 };
             DWORD ReturnLength = 0;
 
-            hr = ::MileGetTokenInformation(
+            hr = Mile::HResultFromLastError(::GetTokenInformation(
                 hCurrentProcessToken,
                 TokenLinkedToken,
                 &LinkedToken,
                 sizeof(TOKEN_LINKED_TOKEN),
-                &ReturnLength);
+                &ReturnLength));
             if (hr == S_OK)
             {
-                hr = ::MileDuplicateToken(
+                hr = Mile::HResultFromLastError(::DuplicateTokenEx(
                     LinkedToken.LinkedToken,
                     MAXIMUM_ALLOWED,
                     nullptr,
                     SecurityIdentification,
                     TokenPrimary,
-                    &OriginalToken);
+                    &OriginalToken));
 
                 ::CloseHandle(LinkedToken.LinkedToken);
             }
@@ -375,23 +336,23 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         return E_INVALIDARG;
     }
 
-    hr = ::MileDuplicateToken(
+    hr = Mile::HResultFromLastError(::DuplicateTokenEx(
         OriginalToken,
         MAXIMUM_ALLOWED,
         nullptr,
         SecurityIdentification,
         TokenPrimary,
-        &hToken);
+        &hToken));
     if (hr != S_OK)
     {
         return hr;
     }
 
-    hr = ::MileSetTokenInformation(
+    hr = Mile::HResultFromLastError(::SetTokenInformation(
         hToken,
         TokenSessionId,
         (PVOID)&SessionID,
-        sizeof(DWORD));
+        sizeof(DWORD)));
     if (hr != S_OK)
     {
         return hr;
@@ -401,7 +362,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
     {
     case NSUDO_PRIVILEGES_MODE_TYPE::ENABLE_ALL_PRIVILEGES:
 
-        hr = ::MileAdjustTokenAllPrivileges(hToken, SE_PRIVILEGE_ENABLED);
+        hr = Mile::AdjustTokenAllPrivileges(hToken, SE_PRIVILEGE_ENABLED);
         if (hr != S_OK)
         {
             return hr;
@@ -410,7 +371,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
         break;
     case NSUDO_PRIVILEGES_MODE_TYPE::DISABLE_ALL_PRIVILEGES:
 
-        hr = ::MileAdjustTokenAllPrivileges(hToken, 0);
+        hr = Mile::AdjustTokenAllPrivileges(hToken, 0);
         if (hr != S_OK)
         {
             return hr;
@@ -423,7 +384,7 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
 
     if (NSUDO_MANDATORY_LABEL_TYPE::UNTRUSTED != MandatoryLabelType)
     {
-        hr = ::MileSetTokenMandatoryLabel(hToken, MandatoryLabelRid);
+        hr = Mile::SetTokenMandatoryLabel(hToken, MandatoryLabelRid);
         if (hr != S_OK)
         {
             return hr;
@@ -449,14 +410,15 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
 
     LPVOID lpEnvironment = nullptr;
 
-    hr = ::MileCreateEnvironmentBlock(&lpEnvironment, hToken, TRUE);
+    hr = Mile::HResultFromLastError(::CreateEnvironmentBlock(
+        &lpEnvironment, hToken, TRUE));
     if (hr == S_OK)
     {
         std::wstring ExpandedString = Mile::ExpandEnvironmentStringsW(
             std::wstring(CommandLine));
         if (hr == S_OK)
         {
-            hr = ::MileCreateProcessAsUser(
+            hr = Mile::HResultFromLastError(::CreateProcessAsUserW(
                 hToken,
                 nullptr,
                 const_cast<LPWSTR>(ExpandedString.c_str()),
@@ -467,23 +429,22 @@ EXTERN_C HRESULT WINAPI NSudoCreateProcess(
                 lpEnvironment,
                 CurrentDirectory,
                 &StartupInfo,
-                &ProcessInfo);
+                &ProcessInfo));
             if (hr == S_OK)
             {
-                ::MileSetPriorityClass(
-                    ProcessInfo.hProcess, ProcessPriority);
+                ::SetPriorityClass(ProcessInfo.hProcess, ProcessPriority);
 
-                ::MileResumeThread(ProcessInfo.hThread, nullptr);
+                ::ResumeThread(ProcessInfo.hThread);
 
-                ::MileWaitForSingleObject(
-                    ProcessInfo.hProcess, WaitInterval, FALSE, nullptr);
+                ::WaitForSingleObjectEx(
+                    ProcessInfo.hProcess, WaitInterval, FALSE);
 
                 ::CloseHandle(ProcessInfo.hProcess);
                 ::CloseHandle(ProcessInfo.hThread);
             }
         }
 
-        ::MileDestroyEnvironmentBlock(lpEnvironment);
+        ::DestroyEnvironmentBlock(lpEnvironment);
     }
 
     return S_OK;

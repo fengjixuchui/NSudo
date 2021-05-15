@@ -1,4 +1,4 @@
-﻿# ![Logo](Logo.png) NSudo - System Administration Toolkit
+﻿# ![Logo](Logo.png) NSudo - 系统管理工具包
 
 [![AppVeyor CI](https://ci.appveyor.com/api/projects/status/github/M2Team/NSudo?branch=master&svg=true)](https://ci.appveyor.com/project/MouriNaruto/nsudo)
 [![Latest Version](https://img.shields.io/github/release/M2Team/NSudo.svg)](https://github.com/M2Team/NSudo/releases/latest)
@@ -8,14 +8,12 @@
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FM2Team%2FNSudo.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FM2Team%2FNSudo?ref=badge_shield)
 
-[简体中文](Readme.zh-CN.md)
+[English](Readme.md)
 
-This is the source code repository of NSudo. If you wonder to visit the NSudo 
-official website, download NSudo or read the NSudo documents etc, please visit
-https://m2team.github.io/NSudo.
+这里是 NSudo 的源代码仓库。如果你想访问 NSudo 的官方网站、下载 NSudo 或者阅读
+NSudo 的文档等，请转到 https://m2team.github.io/NSudo.
 
-This readme file will be the developer oriented document because this it is 
-under the source code repository.
+本自述文件仅面向开发者，毕竟隶属于源代码仓库下。
 
 ## 2021 Development Roadmap
 
@@ -28,42 +26,39 @@ under the source code repository.
 - [ ] Export PDF directly from the offical website.
 - [ ] Improve the Gitee mirror experience.
 
-## Code of Conduct
+## 行为准则
 
-Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+请参阅 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
 
-## Contributing to NSudo
+## 向 NSudo 贡献
 
-### How to become a contributor
+### 如何成为贡献者
 
-- Direct contributions
-  - **Create pull requests directly.**
-  - Please send e-mails to Mouri_Naruto@Outlook.com if you have any
-    questions.
-- Feedback suggestions and bugs.
-  - We use GitHub issues to track bugs and features.
-  - For bugs and general issues please 
-    [file a new issue](https://github.com/M2Team/NSudo/issues/new).
+- 直接贡献
+  - **请直接创建 Pull Requests。**
+  - 如有疑惑，请发送邮件到 Mouri_Naruto@Outlook.com 以进行讨论。
+- 反馈建议和问题
+  - 我们使用 GitHub Issues 跟踪问题和建议。
+  - 对于问题和建议，请[创建新 Issue](https://github.com/M2Team/NSudo/issues/new).
 
-### Code contribution guidelines
+### 代码贡献参考
 
-#### Prerequisites
+#### 构建前置条件
 
-- Visual Studio 2017 Version 15.9 or later.
-  - You also need install ARM and ARM64 components (MSVC Toolchain and ATL/MFC)
-    if you want to compile ARM and ARM64 version of NSudo.
-- Windows 10 Version 1507 SDK or later.
-  - You also need install ARM and ARM64 components when you installing the 
-    Windows 10 Version 1703 SDK or later and you want to compile ARM and ARM64
-    version of NSudo.
+- Visual Studio 2017 Version 15.9 及之后版本。
+  - 如果你要编译 ARM 和 ARM64 版本的 NSudo 还需要勾选 ARM 和 ARM64 版本的 MSVC
+    编译工具链和 ATL/MFC 组件。
+- Windows 10 Version 1507 SDK 及之后版本。
+  - 如果你使用的是 Windows 10 Version 1703 SDK 及之后版本且你要编译 ARM 和 
+    ARM64 版本的 NSudo 还需要勾选 ARM 和 ARM64 的相关组件。
 
-#### How to build all targets of NSudo
+#### 编译 NSudo 的所有目标
 
-Run `BuildAllTargets.bat` in `src/Native`.
+运行 `src/Native` 目录下的 `BuildAllTargets.bat`。
 
-#### How to modify or debugging NSudo
+#### 如何修改和调试 NSudo
 
-Open `NSudo.sln` in `src/Native`.
+运行 `src/Native` 目录下的 `NSudo.sln`。
 
 #### Code style and conventions
 
@@ -84,15 +79,13 @@ project:
 * The contribution is correctly attributed in the [Readme](Readme.md)
 file in the repository, as needed.
 
-### How to update documents.
+### 如何更新文档
 
-Refer to https://github.com/M2Team/NSudo/pull/29.
+请参阅 https://github.com/M2Team/NSudo/pull/29。
 
-To build new docs, you'll need to have [Node.js](https://nodejs.org) and 
-[Yarn](https://yarnpkg.com) installed on your system, and run `build.bat` in
-`src/Documents`.
+如要编译文档，你需要在你的开发环境下安装 [Node.js](https://nodejs.org) 和 
+[Yarn](https://yarnpkg.com) 后运行 `src/Documents` 目录下的 `build.bat`。
 
-Docs will be built into `docs`, where GitHub Pages treated as site root. So be
-sure to commit `docs` changes.
+构建的新文档将会放在 `docs` 目录下且 GitHub Pages 将该目录视为站点的根目录。
 
-Docs engine is based on [VuePress](https://v1.vuepress.vuejs.org).
+文档引擎基于 [VuePress](https://v1.vuepress.vuejs.org) 构建。
